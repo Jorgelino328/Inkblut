@@ -296,8 +296,10 @@ _data = {
 }
 
 [node name="Tank" type="CharacterBody2D"]
+z_index = 1
 texture_filter = 1
 scale = Vector2(15, 15)
+collision_mask = 7
 script = ExtResource("1_n6i77")
 
 [node name="Collision" type="CollisionShape2D" parent="."]
@@ -332,7 +334,7 @@ texture = ExtResource("3_rblo0")
 offset = Vector2(4, 0)
 
 [node name="GunPoint" type="Marker2D" parent="Body/Cannon"]
-position = Vector2(16.2667, -8.19564e-08)
+position = Vector2(6.46667, -1.19209e-07)
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="."]
 libraries = {

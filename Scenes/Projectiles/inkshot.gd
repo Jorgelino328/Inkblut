@@ -6,8 +6,9 @@ extends RigidBody2D
 @onready var anim = $AnimationPlayer
 
 var target_position = Vector2.ZERO
-var splash_scene = preload("res://Scenes/Persistent/inksplash.tscn")
 var shooter_node = null
+
+signal paint_splat(global_pos, team_id, splat_radius)
 
 func _ready():
 	gravity_scale = gravity_strength
@@ -16,30 +17,25 @@ func _ready():
 
 	look_at(target_position)
 	linear_velocity = transform.x.normalized() * speed
-
-	connect("body_entered", Callable(self, "_on_body_entered"))
+	
+	body_entered.connect(_on_collision)
+	$AnimationPlayer.animation_finished.connect(_on_animation_finished)
 
 func _on_collision(body):
 	if body is Tank and body != shooter_node:
 		body.HP -= 1
 		queue_free()
 		return
-
 	elif body != shooter_node:
-		var splash_instance = splash_scene.instantiate()
-		get_parent().add_child(splash_instance)
-
-		splash_instance.global_position = self.global_position
-
-		var impact_direction = global_transform.x.normalized()
-		var surface_normal = -impact_direction
-		splash_instance.rotation = surface_normal.angle()
-
-		queue_free()
+		linear_velocity = Vector2.ZERO
+		anim.play("Shoot_Splatter")
+		emit_signal("paint_splat", global_position, 1, 10)
 
 func _on_animation_finished(anim_name):
 	if anim_name == "Shoot_Fire":
 		anim.play("Shoot_Idle")
+	elif anim_name == "Shoot_Splatter":
+		queue_free()
 
 func setup(pos, shooter):
 	target_position = pos

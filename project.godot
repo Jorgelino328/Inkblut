@@ -45,6 +45,12 @@ dash={
 ]
 }
 
+[layer_names]
+
+2d_physics/layer_1="Chars"
+2d_physics/layer_2="Projectiles"
+2d_physics/layer_3="Walls"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

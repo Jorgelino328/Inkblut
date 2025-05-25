@@ -4,8 +4,11 @@ class_name Tank extends CharacterBody2D
 @export var HP = 10
 @export var SPEED = 300.0
 @export var JUMP_VELOCITY = -400.0
+@export var paintable_map: TileMap
+
 var shot = preload("res://Scenes/Projectiles/inkshot.tscn")
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
+
 
 func _physics_process(delta):
 	
@@ -53,6 +56,7 @@ func shoot():
 	shot_instance.setup(get_global_mouse_position(),self)
 	shot_instance.global_position = $Body/Cannon/GunPoint.global_position
 	get_tree().get_root().add_child(shot_instance)
+	shot_instance.connect("paint_splat", Callable(paintable_map, "on_paint_splat"))
 
 func _on_animation_finished(anim_name):
 	if (anim_name == "Jump"):
@@ -62,4 +66,4 @@ func _on_hit(body):
 	anim.play("Hit")
 
 func _on_hit_floor(body):
-	anim.play("Jump_Fall")
+	anim.play("Jump_Land")
