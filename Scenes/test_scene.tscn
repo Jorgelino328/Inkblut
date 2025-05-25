@@ -1,0 +1,68 @@
+[gd_scene load_steps=4 format=3 uid="uid://yay87v1ko81w"]
+
+[ext_resource type="PackedScene" uid="uid://g7evstn6dpjd" path="res://Scenes/Actors/tank.tscn" id="1_lbsgw"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_8v5yu"]
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_35v8e"]
+
+[node name="TestScene" type="Node2D"]
+
+[node name="ColorRect" type="ColorRect" parent="."]
+offset_left = -10.0
+offset_top = -91.0
+offset_right = 86.0
+offset_bottom = -4.0
+scale = Vector2(13.32, 9.64)
+color = Color(0.933333, 0.0117647, 0.635294, 1)
+metadata/_edit_use_anchors_ = true
+
+[node name="Tank" parent="." instance=ExtResource("1_lbsgw")]
+position = Vector2(552, 448)
+
+[node name="Walls" type="Node2D" parent="."]
+position = Vector2(591, 625)
+scale = Vector2(60.3526, -7.51836)
+
+[node name="WallLeft" type="StaticBody2D" parent="Walls"]
+position = Vector2(-9.85873, 40.4343)
+rotation = 1.5708
+scale = Vector2(7.16259, 0.0881545)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/WallLeft"]
+modulate = Color(1, 0, 1, 1)
+shape = SubResource("RectangleShape2D_8v5yu")
+metadata/_edit_lock_ = true
+
+[node name="Sprite2D" type="Sprite2D" parent="Walls/WallLeft"]
+modulate = Color(0, 1, 1, 1)
+scale = Vector2(-0.0386602, 0.036075)
+texture = SubResource("NoiseTexture2D_35v8e")
+
+[node name="Floor" type="StaticBody2D" parent="Walls"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/Floor"]
+modulate = Color(1, 0, 1, 1)
+shape = SubResource("RectangleShape2D_8v5yu")
+metadata/_edit_lock_ = true
+
+[node name="Sprite2D" type="Sprite2D" parent="Walls/Floor"]
+modulate = Color(0, 1, 1, 1)
+scale = Vector2(-0.0386602, 0.036075)
+texture = SubResource("NoiseTexture2D_35v8e")
+
+[node name="WallRight" type="StaticBody2D" parent="Walls"]
+position = Vector2(9.59362, 38.9712)
+rotation = 1.5708
+scale = Vector2(7.16259, 0.0881545)
+collision_mask = 3
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Walls/WallRight"]
+modulate = Color(1, 0, 1, 1)
+shape = SubResource("RectangleShape2D_8v5yu")
+metadata/_edit_lock_ = true
+
+[node name="Sprite2D" type="Sprite2D" parent="Walls/WallRight"]
+modulate = Color(0, 1, 1, 1)
+scale = Vector2(-0.0386602, 0.036075)
+texture = SubResource("NoiseTexture2D_35v8e")
