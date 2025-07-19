@@ -1,0 +1,55 @@
+[gd_scene load_steps=4 format=3 uid="uid://svdg820khmat"]
+
+[ext_resource type="Texture2D" uid="uid://b4bqicyso63m2" path="res://Assets/Sprites/menu.png" id="1_xmimp"]
+[ext_resource type="FontFile" uid="uid://cqp33stkjbo7x" path="res://Assets/Fonts/Typodermic Fonts/octin spraypaint a rg.otf" id="2_84rtu"]
+[ext_resource type="Theme" uid="uid://dyswh45trxwxj" path="res://Assets/Themes/inkblut_classic.tres" id="3_4iisa"]
+
+[node name="GameOver" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+
+[node name="ColorRect" type="ColorRect" parent="."]
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 1240.0
+offset_bottom = 688.0
+color = Color(0.176471, 0.0627451, 0.152941, 1)
+
+[node name="TextureRect" type="TextureRect" parent="."]
+modulate = Color(0.172549, 0, 0.215686, 1)
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 1240.0
+offset_bottom = 688.0
+texture = ExtResource("1_xmimp")
+expand_mode = 1
+
+[node name="Label" type="Label" parent="."]
+offset_left = 224.0
+offset_top = 80.0
+offset_right = 944.0
+offset_bottom = 320.0
+theme_override_colors/font_color = Color(0.329412, 0, 0, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 10
+theme_override_constants/shadow_offset_y = 20
+theme_override_constants/shadow_outline_size = 55
+theme_override_fonts/font = ExtResource("2_84rtu")
+theme_override_font_sizes/font_size = 200
+text = "YOU DIED"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+offset_left = 296.0
+offset_top = 392.0
+offset_right = 896.0
+offset_bottom = 628.0
+theme = ExtResource("3_4iisa")
+theme_override_constants/separation = 25
+
+[node name="Button" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "RESPAWN"
+
+[node name="Button2" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+text = "Quit"

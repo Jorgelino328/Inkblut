@@ -1,0 +1,33 @@
+[remap]
+
+importer="font_data_dynamic"
+type="FontFile"
+uid="uid://c4jvq6r5dc5dd"
+path="res://.godot/imported/steelfish rg it.otf-dcc0d7722383e5697e86bda543ded891.fontdata"
+
+[deps]
+
+source_file="res://Assets/Fonts/Typodermic Fonts/steelfish rg it.otf"
+dest_files=["res://.godot/imported/steelfish rg it.otf-dcc0d7722383e5697e86bda543ded891.fontdata"]
+
+[params]
+
+Rendering=null
+antialiasing=1
+generate_mipmaps=false
+multichannel_signed_distance_field=false
+msdf_pixel_range=8
+msdf_size=48
+allow_system_fallback=true
+force_autohinter=false
+hinting=1
+subpixel_positioning=1
+oversampling=0.0
+Fallbacks=null
+fallbacks=[]
+Compress=null
+compress=true
+preload=[]
+language_support={}
+script_support={}
+opentype_features={}

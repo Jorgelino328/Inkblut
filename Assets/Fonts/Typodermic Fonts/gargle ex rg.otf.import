@@ -1,0 +1,33 @@
+[remap]
+
+importer="font_data_dynamic"
+type="FontFile"
+uid="uid://bkvph01770818"
+path="res://.godot/imported/gargle ex rg.otf-eef55700c2d0ec3dbda586050f64394a.fontdata"
+
+[deps]
+
+source_file="res://Assets/Fonts/Typodermic Fonts/gargle ex rg.otf"
+dest_files=["res://.godot/imported/gargle ex rg.otf-eef55700c2d0ec3dbda586050f64394a.fontdata"]
+
+[params]
+
+Rendering=null
+antialiasing=1
+generate_mipmaps=false
+multichannel_signed_distance_field=false
+msdf_pixel_range=8
+msdf_size=48
+allow_system_fallback=true
+force_autohinter=false
+hinting=1
+subpixel_positioning=1
+oversampling=0.0
+Fallbacks=null
+fallbacks=[]
+Compress=null
+compress=true
+preload=[]
+language_support={}
+script_support={}
+opentype_features={}

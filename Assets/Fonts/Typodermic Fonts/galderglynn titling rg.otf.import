@@ -1,0 +1,33 @@
+[remap]
+
+importer="font_data_dynamic"
+type="FontFile"
+uid="uid://ct1qimmivb4bs"
+path="res://.godot/imported/galderglynn titling rg.otf-69e67b33a625ffefcf45ebaddd7df725.fontdata"
+
+[deps]
+
+source_file="res://Assets/Fonts/Typodermic Fonts/galderglynn titling rg.otf"
+dest_files=["res://.godot/imported/galderglynn titling rg.otf-69e67b33a625ffefcf45ebaddd7df725.fontdata"]
+
+[params]
+
+Rendering=null
+antialiasing=1
+generate_mipmaps=false
+multichannel_signed_distance_field=false
+msdf_pixel_range=8
+msdf_size=48
+allow_system_fallback=true
+force_autohinter=false
+hinting=1
+subpixel_positioning=1
+oversampling=0.0
+Fallbacks=null
+fallbacks=[]
+Compress=null
+compress=true
+preload=[]
+language_support={}
+script_support={}
+opentype_features={}

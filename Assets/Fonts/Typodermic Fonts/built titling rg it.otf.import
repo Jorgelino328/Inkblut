@@ -1,0 +1,33 @@
+[remap]
+
+importer="font_data_dynamic"
+type="FontFile"
+uid="uid://devj5ekbdj7qf"
+path="res://.godot/imported/built titling rg it.otf-6b26b14d47eacebafdb02f2ee43d0c00.fontdata"
+
+[deps]
+
+source_file="res://Assets/Fonts/Typodermic Fonts/built titling rg it.otf"
+dest_files=["res://.godot/imported/built titling rg it.otf-6b26b14d47eacebafdb02f2ee43d0c00.fontdata"]
+
+[params]
+
+Rendering=null
+antialiasing=1
+generate_mipmaps=false
+multichannel_signed_distance_field=false
+msdf_pixel_range=8
+msdf_size=48
+allow_system_fallback=true
+force_autohinter=false
+hinting=1
+subpixel_positioning=1
+oversampling=0.0
+Fallbacks=null
+fallbacks=[]
+Compress=null
+compress=true
+preload=[]
+language_support={}
+script_support={}
+opentype_features={}
