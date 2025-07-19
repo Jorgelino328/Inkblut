@@ -3,13 +3,13 @@
 [ext_resource type="Theme" uid="uid://dyswh45trxwxj" path="res://Assets/Themes/inkblut_classic.tres" id="1_djwy0"]
 [ext_resource type="Texture2D" uid="uid://b4bqicyso63m2" path="res://Assets/Sprites/menu.png" id="2_wyf64"]
 [ext_resource type="Texture2D" uid="uid://dr5p426y35q8m" path="res://Assets/Sprites/magnifier.png" id="3_biecr"]
-
-[sub_resource type="Theme" id="Theme_wx648"]
+[ext_resource type="Script" path="res://Scenes/UI/find_game.gd" id="4_find_game"]
 
 [node name="FindGame" type="Control"]
 layout_mode = 3
 anchors_preset = 0
 theme = ExtResource("1_djwy0")
+script = ExtResource("4_find_game")
 
 [node name="BackgroundColor" type="ColorRect" parent="."]
 layout_mode = 0
@@ -84,6 +84,14 @@ popup/item_3/id = 3
 layout_mode = 2
 text = "BACK"
 
+[node name="CreateTestServerButton" type="Button" parent="MenuContainerH/MenuContainerV"]
+layout_mode = 2
+text = "CREATE TEST SERVER"
+
+[node name="CreateFullServerButton" type="Button" parent="MenuContainerH/MenuContainerV"]
+layout_mode = 2
+text = "CREATE FULL SERVER"
+
 [node name="CheckboxContainer" type="HBoxContainer" parent="MenuContainerH/MenuContainerV"]
 layout_mode = 2
 theme_override_constants/separation = 31
@@ -107,14 +115,14 @@ icon_alignment = 1
 
 [node name="SearchField" type="LineEdit" parent="."]
 layout_mode = 0
-offset_left = 400.0
+offset_left = 448.0
 offset_top = 168.0
 offset_right = 1088.0
 offset_bottom = 200.0
 
 [node name="ServerPanel" type="Panel" parent="."]
 layout_mode = 2
-offset_left = 400.0
+offset_left = 440.0
 offset_top = 208.0
 offset_right = 1128.0
 offset_bottom = 608.0
@@ -128,12 +136,3 @@ offset_bottom = 154.0
 scale = Vector2(0.5, 0.5)
 theme_override_constants/separation = 10
 metadata/_edit_group_ = true
-
-[node name="LobbyExample" type="Button" parent="ServerPanel/ServerContainer"]
-layout_mode = 2
-theme = SubResource("Theme_wx648")
-text = "LObby 1 - FREE-FOR-ALL - MAP 1 - 2/10"
-
-[node name="LobbyExample2" type="Button" parent="ServerPanel/ServerContainer"]
-layout_mode = 2
-text = "LObby 2 - TEAM DEATHMATCH - MAP 2 - 10/10"

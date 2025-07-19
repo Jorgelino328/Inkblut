@@ -61,3 +61,23 @@ text = "Settings"
 [node name="QuitButton" type="Button" parent="MenuContainer"]
 layout_mode = 2
 text = "Quit"
+
+[node name="VSeparator" type="VSeparator" parent="MenuContainer"]
+layout_mode = 2
+
+[node name="DebugLabel" type="Label" parent="MenuContainer"]
+layout_mode = 2
+text = "--- DEBUG TESTING ---"
+horizontal_alignment = 1
+
+[node name="TestServerButton" type="Button" parent="MenuContainer"]
+layout_mode = 2
+text = "Start Test Server"
+
+[node name="TestClientButton" type="Button" parent="MenuContainer"]
+layout_mode = 2
+text = "Start Test Client"
+
+[node name="CreateDebugServerButton" type="Button" parent="MenuContainer"]
+layout_mode = 2
+text = "Create Debug Server (Background)"
