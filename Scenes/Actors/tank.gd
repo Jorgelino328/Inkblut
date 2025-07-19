@@ -63,7 +63,19 @@ func _on_animation_finished(anim_name):
 		anim.play("Jump_Fall")
 
 func _on_hit(body):
+	HP -= 1
 	anim.play("Hit")
+	if HP <= 0:
+		die()
+
+func die():
+	# Get reference to the main scene and show game over
+	var main_scene = get_tree().get_first_node_in_group("main")
+	if main_scene:
+		main_scene.show_game_over()
+	else:
+		# Fallback - just reload the scene
+		get_tree().reload_current_scene()
 
 func _on_hit_floor(body):
 	anim.play("Jump_Land")
