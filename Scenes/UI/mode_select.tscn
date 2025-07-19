@@ -1,0 +1,67 @@
+[gd_scene load_steps=3 format=3 uid="uid://b25qqa3jnjqr4"]
+
+[ext_resource type="Texture2D" uid="uid://b4bqicyso63m2" path="res://Assets/Sprites/menu.png" id="1_07k5m"]
+[ext_resource type="Theme" uid="uid://dyswh45trxwxj" path="res://Assets/Themes/inkblut_classic.tres" id="2_1kbqs"]
+
+[node name="ModeSelect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BackgroundColor" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 1240.0
+offset_bottom = 688.0
+color = Color(0.176471, 0.0627451, 0.152941, 1)
+
+[node name="MenuTexture" type="TextureRect" parent="."]
+modulate = Color(0.172549, 0, 0.215686, 1)
+layout_mode = 0
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 1240.0
+offset_bottom = 688.0
+texture = ExtResource("1_07k5m")
+expand_mode = 1
+metadata/_edit_lock_ = true
+
+[node name="ModeLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 176.0
+offset_top = 88.0
+offset_right = 975.0
+offset_bottom = 328.0
+theme = ExtResource("2_1kbqs")
+theme_override_font_sizes/font_size = 100
+text = "Select game mode"
+
+[node name="ModeContainer" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 280.0
+offset_top = 248.0
+offset_right = 880.0
+offset_bottom = 536.0
+theme = ExtResource("2_1kbqs")
+theme_override_constants/separation = 25
+metadata/_edit_group_ = true
+
+[node name="QuickGameButton" type="Button" parent="ModeContainer"]
+layout_mode = 2
+text = "Quick Play"
+
+[node name="FindGameButton" type="Button" parent="ModeContainer"]
+layout_mode = 2
+text = "FIND GAME"
+
+[node name="HostGameButton" type="Button" parent="ModeContainer"]
+layout_mode = 2
+text = "HOST GAME"
+
+[node name="BackButton" type="Button" parent="ModeContainer"]
+layout_mode = 2
+text = "BACK"

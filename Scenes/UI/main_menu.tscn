@@ -8,7 +8,7 @@
 layout_mode = 3
 anchors_preset = 0
 
-[node name="ColorRect" type="ColorRect" parent="."]
+[node name="BackgroundColor" type="ColorRect" parent="."]
 layout_mode = 0
 offset_left = -16.0
 offset_top = -16.0
@@ -16,7 +16,7 @@ offset_right = 1240.0
 offset_bottom = 688.0
 color = Color(0.176471, 0.0627451, 0.152941, 1)
 
-[node name="TextureRect" type="TextureRect" parent="."]
+[node name="MenuTexture" type="TextureRect" parent="."]
 modulate = Color(0.172549, 0, 0.215686, 1)
 layout_mode = 0
 offset_left = -16.0
@@ -26,7 +26,7 @@ offset_bottom = 688.0
 texture = ExtResource("1_t554u")
 expand_mode = 1
 
-[node name="Label" type="Label" parent="."]
+[node name="TitleLabel" type="Label" parent="."]
 layout_mode = 0
 offset_left = 264.0
 offset_top = 40.0
@@ -41,7 +41,7 @@ theme_override_fonts/font = ExtResource("1_n1ud2")
 theme_override_font_sizes/font_size = 200
 text = "INKBLUT"
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
+[node name="MenuContainer" type="VBoxContainer" parent="."]
 layout_mode = 0
 offset_left = 296.0
 offset_top = 320.0
@@ -50,14 +50,14 @@ offset_bottom = 628.0
 theme = ExtResource("2_7nnll")
 theme_override_constants/separation = 25
 
-[node name="Button" type="Button" parent="VBoxContainer"]
+[node name="PlayButton" type="Button" parent="MenuContainer"]
 layout_mode = 2
 text = "Play"
 
-[node name="Button3" type="Button" parent="VBoxContainer"]
+[node name="SettingButton" type="Button" parent="MenuContainer"]
 layout_mode = 2
 text = "Settings"
 
-[node name="Button2" type="Button" parent="VBoxContainer"]
+[node name="QuitButton" type="Button" parent="MenuContainer"]
 layout_mode = 2
 text = "Quit"

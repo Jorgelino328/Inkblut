@@ -1,0 +1,139 @@
+[gd_scene load_steps=5 format=3 uid="uid://d2430y23xw0n3"]
+
+[ext_resource type="Theme" uid="uid://dyswh45trxwxj" path="res://Assets/Themes/inkblut_classic.tres" id="1_djwy0"]
+[ext_resource type="Texture2D" uid="uid://b4bqicyso63m2" path="res://Assets/Sprites/menu.png" id="2_wyf64"]
+[ext_resource type="Texture2D" uid="uid://dr5p426y35q8m" path="res://Assets/Sprites/magnifier.png" id="3_biecr"]
+
+[sub_resource type="Theme" id="Theme_wx648"]
+
+[node name="FindGame" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+theme = ExtResource("1_djwy0")
+
+[node name="BackgroundColor" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 1248.0
+offset_bottom = 696.0
+color = Color(0.176471, 0.0627451, 0.152941, 1)
+metadata/_edit_lock_ = true
+
+[node name="TextureRect" type="TextureRect" parent="."]
+modulate = Color(0.172549, 0, 0.215686, 1)
+layout_mode = 0
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 1240.0
+offset_bottom = 688.0
+texture = ExtResource("2_wyf64")
+expand_mode = 1
+metadata/_edit_lock_ = true
+
+[node name="ServerLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 400.0
+offset_top = 24.0
+offset_right = 880.0
+offset_bottom = 264.0
+theme = ExtResource("1_djwy0")
+theme_override_font_sizes/font_size = 100
+text = "SERVER LIST"
+
+[node name="MenuContainerH" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 168.0
+offset_right = 384.0
+offset_bottom = 341.0
+
+[node name="MenuContainerV" type="VBoxContainer" parent="MenuContainerH"]
+layout_mode = 2
+theme_override_constants/separation = 20
+metadata/_edit_lock_ = true
+metadata/_edit_group_ = true
+
+[node name="GameModeButton" type="OptionButton" parent="MenuContainerH/MenuContainerV"]
+layout_mode = 2
+alignment = 1
+item_count = 3
+selected = 0
+popup/item_0/text = "GAME MODE"
+popup/item_0/id = 0
+popup/item_1/text = "TEAM DEATHMATCH"
+popup/item_1/id = 1
+popup/item_2/text = "FREE-FOR-ALL"
+popup/item_2/id = 2
+
+[node name="MapButton" type="OptionButton" parent="MenuContainerH/MenuContainerV"]
+layout_mode = 2
+alignment = 1
+item_count = 4
+selected = 0
+popup/item_0/text = "CHOOSE MAP"
+popup/item_0/id = 0
+popup/item_1/text = "MAP 1"
+popup/item_1/id = 1
+popup/item_2/text = "MAP 2"
+popup/item_2/id = 2
+popup/item_3/text = "MAP 3"
+popup/item_3/id = 3
+
+[node name="BackButton" type="Button" parent="MenuContainerH/MenuContainerV"]
+layout_mode = 2
+text = "BACK"
+
+[node name="CheckboxContainer" type="HBoxContainer" parent="MenuContainerH/MenuContainerV"]
+layout_mode = 2
+theme_override_constants/separation = 31
+
+[node name="IsJoinableLabel" type="Label" parent="MenuContainerH/MenuContainerV/CheckboxContainer"]
+layout_mode = 2
+text = " SHOW JOINABLE"
+
+[node name="IsJoinable" type="CheckBox" parent="MenuContainerH/MenuContainerV/CheckboxContainer"]
+layout_mode = 2
+
+[node name="SearchButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 1136.0
+offset_top = 167.0
+offset_right = 1335.0
+offset_bottom = 335.0
+scale = Vector2(-0.2, 0.2)
+icon = ExtResource("3_biecr")
+icon_alignment = 1
+
+[node name="SearchField" type="LineEdit" parent="."]
+layout_mode = 0
+offset_left = 400.0
+offset_top = 168.0
+offset_right = 1088.0
+offset_bottom = 200.0
+
+[node name="ServerPanel" type="Panel" parent="."]
+layout_mode = 2
+offset_left = 400.0
+offset_top = 208.0
+offset_right = 1128.0
+offset_bottom = 608.0
+
+[node name="ServerContainer" type="VBoxContainer" parent="ServerPanel"]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 24.0
+offset_right = 1392.0
+offset_bottom = 154.0
+scale = Vector2(0.5, 0.5)
+theme_override_constants/separation = 10
+metadata/_edit_group_ = true
+
+[node name="LobbyExample" type="Button" parent="ServerPanel/ServerContainer"]
+layout_mode = 2
+theme = SubResource("Theme_wx648")
+text = "LObby 1 - FREE-FOR-ALL - MAP 1 - 2/10"
+
+[node name="LobbyExample2" type="Button" parent="ServerPanel/ServerContainer"]
+layout_mode = 2
+text = "LObby 2 - TEAM DEATHMATCH - MAP 2 - 10/10"
