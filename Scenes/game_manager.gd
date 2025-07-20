@@ -39,9 +39,7 @@ func _ready():
 	is_host = multiplayer.is_server()
 	print("GameManager is_host: ", is_host)
 	
-	if is_host:
-		# Start the game for all players
-		call_deferred("start_game")
+	# Don't auto-start the game, wait for set_game_mode to be called
 
 func _collect_spawn_areas():
 	"""Collect all Area2D nodes marked as spawn areas from the current scene."""
@@ -81,6 +79,11 @@ func set_game_mode(mode: String):
 	print("Setting game mode to: ", mode)
 	game_mode = mode
 	print("Game mode set to: ", game_mode)
+	
+	# If we're the host and the game mode is set, start the game
+	if is_host:
+		print("Host detected, starting game with mode: ", game_mode)
+		call_deferred("start_game")
 
 func start_game():
 	print("=== GAMEMANAGER START_GAME CALLED ===")
@@ -108,24 +111,40 @@ func start_game():
 		spawn_player(player_id)
 		print("spawn_player called for player: ", player_id)
 	
+	# Sync game state to all clients
+	print("=== SYNCING GAME STATE TO ALL CLIENTS ===")
+	for client_id in multiplayer.get_peers():
+		print("Syncing game state to client: ", client_id)
+		_sync_game_state_to_client.rpc_id(client_id, players, game_mode)
+	
 	game_started.emit()
 
 func _assign_teams_and_colors(player_ids: Array):
+	print("=== _ASSIGN_TEAMS_AND_COLORS ===")
+	print("Game mode: '", game_mode, "'")
+	print("Player IDs: ", player_ids)
 	match game_mode:
 		"TEAM DEATHMATCH", "TEAM":
+			print("Calling _assign_team_mode")
 			_assign_team_mode(player_ids)
 		"FREE-FOR-ALL":
+			print("Calling _assign_ffa_mode")
 			_assign_ffa_mode(player_ids)
 		_:
 			# Default to FFA
+			print("Defaulting to FFA mode")
 			_assign_ffa_mode(player_ids)
 
 func _assign_team_mode(player_ids: Array):
-	# Divide players into two teams
+	print("=== ASSIGNING TEAM MODE (COPY OF FFA) ===")
+	print("Player IDs to assign: ", player_ids)
+	# Copy FFA logic exactly but with team colors
 	for i in range(player_ids.size()):
 		var player_id = player_ids[i]
-		var team = "Team A" if i % 2 == 0 else "Team B"
-		var color = team_colors[0] if team == "Team A" else team_colors[1]
+		# Use only red and blue colors for teams
+		var team_color_index = i % 2  # Alternate between 0 (red) and 1 (blue)
+		var color = team_colors[team_color_index]
+		var team = "Team A" if team_color_index == 0 else "Team B"
 		
 		players[player_id] = {
 			"id": player_id,
@@ -133,8 +152,11 @@ func _assign_team_mode(player_ids: Array):
 			"color": color,
 			"tank_node": null
 		}
+		print("Assigned player ", player_id, " to ", team, " with color ", color)
 
 func _assign_ffa_mode(player_ids: Array):
+	print("=== ASSIGNING FFA MODE ===")
+	print("Player IDs to assign: ", player_ids)
 	# Each player gets their own color
 	for i in range(player_ids.size()):
 		var player_id = player_ids[i]
@@ -146,7 +168,8 @@ func _assign_ffa_mode(player_ids: Array):
 			"color": color,
 			"tank_node": null
 		}
-
+		print("Assigned player ", player_id, " to Individual team with color ", color)
+		
 @rpc("any_peer", "reliable", "call_local")
 func spawn_player(player_id: int):
 	print("=== SPAWN_PLAYER CALLED ===")
@@ -250,14 +273,8 @@ func _on_player_connected(id: int):
 		if is_game_active():
 			print("Game in progress, adding new player to game: ", id)
 			
-			# Add new player to players dictionary
-			var color = team_colors[(players.size()) % team_colors.size()]
-			players[id] = {
-				"id": id,
-				"team": "Individual",
-				"color": color,
-				"tank_node": null
-			}
+			# Add new player to players dictionary with proper team assignment
+			_assign_new_player_to_game(id)
 			
 			# Sync current state to new client (including existing players)
 			_sync_game_state_to_client.rpc_id(id, players, game_mode)
@@ -568,3 +585,35 @@ func _spawn_new_player_for_client(player_id: int, player_data: Dictionary):
 	
 	# Spawn the new player locally
 	spawn_player(player_id)
+
+func _assign_new_player_to_game(player_id: int):
+	"""Assign a new player to the appropriate team based on current game mode"""
+	print("Assigning new player ", player_id, " to game mode: ", game_mode)
+	
+	match game_mode:
+		"TEAM DEATHMATCH", "TEAM":
+			# For team modes, assign alternating teams
+			var team_color_index = players.size() % 2
+			var assigned_team = "Team A" if team_color_index == 0 else "Team B"
+			var assigned_color = team_colors[team_color_index]
+			
+			players[player_id] = {
+				"id": player_id,
+				"team": assigned_team,
+				"color": assigned_color,
+				"tank_node": null
+			}
+			
+			print("Assigned new player ", player_id, " to ", assigned_team, " with color ", assigned_color)
+			
+		_:
+			# For FFA and default, assign individual team with unique color
+			var color = team_colors[players.size() % team_colors.size()]
+			players[player_id] = {
+				"id": player_id,
+				"team": "Individual",
+				"color": color,
+				"tank_node": null
+			}
+			
+			print("Assigned new player ", player_id, " to Individual with color ", color)
