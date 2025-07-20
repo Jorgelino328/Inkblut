@@ -2,7 +2,7 @@
 
 [ext_resource type="TileSet" uid="uid://utj8sukqowuk" path="res://Scenes/Levels/test_tileset.tres" id="1_bwv5a"]
 [ext_resource type="Script" path="res://Scenes/TileLogic/paintable_walls.gd" id="1_u4qxu"]
-[ext_resource type="Script" path="res://game_manager.gd" id="2_gm"]
+[ext_resource type="Script" path="res://Scenes/game_manager.gd" id="2_gm"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(120, 120)
@@ -87,3 +87,4 @@ shape = SubResource("RectangleShape2D_6")
 
 [node name="GameManager" type="Node" parent="."]
 script = ExtResource("2_gm")
+team_colors = null

@@ -17,7 +17,7 @@ func _ready():
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_noise.frequency = noise_frequency
 
-func on_paint_splat(hit_pos, team_id, splat_radius):
+func on_paint_splat(hit_pos, paint_color: Color, splat_radius):
 	var hit_local_pos = to_local(hit_pos)
 	var hit_coords = local_to_map(hit_local_pos)
 	
@@ -49,32 +49,12 @@ func on_paint_splat(hit_pos, team_id, splat_radius):
 				var tile_data = get_cell_tile_data(0, cell_coords)
 				
 				if tile_data != null and tile_data.get_custom_data("is_paintable"):
-					var current_tile_team_id = tile_data.get_custom_data("painted_team")
-
-					if current_tile_team_id == null: 
-						current_tile_team_id = -1 
-
-					if current_tile_team_id != team_id:
-						var new_color_to_set
-						var team_id_to_set_on_tile 
-						
-						match team_id:
-							1:
-								team_id_to_set_on_tile = 1
-								new_color_to_set = team1_color
-							2:
-								team_id_to_set_on_tile = 2
-								new_color_to_set = team2_color
-							_:
-								team_id_to_set_on_tile = 0 
-								new_color_to_set = unpainted_color
-						
-						var captured_color = new_color_to_set
-						var captured_team = team_id_to_set_on_tile
-						
+					var current_tile_color = tile_data.modulate
+					
+					# Only paint if the color is different
+					if current_tile_color != paint_color:
 						update_tile(0, cell_coords, func(td):
-							td.modulate = captured_color
-							td.set_custom_data("painted_team", captured_team)
+							td.modulate = paint_color
 						)
 						updates_queued = true
 	

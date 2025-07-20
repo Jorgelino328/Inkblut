@@ -26,6 +26,7 @@ func _ready():
 		if network_manager:
 			network_manager.player_joined.connect(_on_player_joined)
 			network_manager.player_left.connect(_on_player_left)
+			network_manager.server_info_updated.connect(_update_server_info)
 			
 			var server_info = network_manager.get_server_info()
 			print("Server info: ", server_info)
@@ -45,14 +46,46 @@ func _ready():
 	_update_player_list()
 
 func _update_server_info():
+	print("=== LOBBY: UPDATING SERVER INFO ===")
 	if network_manager:
 		var info = network_manager.get_server_info()
+		print("Server info from network manager: ", info)
 		if info.size() > 0:
-			server_info_label.text = "Server: %s - %s - %s" % [
+			var current_players = info.get("current_players", 1)
+			var max_players = info.get("max_players", 4)
+			var game_mode = info.get("game_mode", "Unknown")
+			
+			var status_text = ""
+			
+			# Add team balance info for team modes
+			if game_mode == "TEAM DEATHMATCH":
+				if current_players < 2:
+					status_text = " - Waiting for players"
+				elif current_players % 2 != 0:
+					status_text = " - Waiting for balanced teams"
+				else:
+					status_text = " - Teams balanced, ready to start!"
+			
+			server_info_label.text = "Server: %s - %s - %s (%d/%d players)%s" % [
 				info.get("name", "Unknown"),
-				info.get("game_mode", "Unknown"), 
-				info.get("map", "Unknown")
+				game_mode, 
+				info.get("map", "Unknown"),
+				current_players,
+				max_players,
+				status_text
 			]
+			
+			# Update start button state
+			if is_host:
+				var can_start = _can_start_game()
+				start_game_button.disabled = not can_start
+				if not can_start and game_mode == "TEAM DEATHMATCH":
+					if current_players < 2:
+						start_game_button.text = "Need More Players"
+					elif current_players % 2 != 0:
+						start_game_button.text = "Need Balanced Teams"
+				else:
+					start_game_button.text = "Start Game"
 
 func _update_player_list():
 	print("=== UPDATING PLAYER LIST ===")
@@ -92,15 +125,44 @@ func _update_debug_info():
 func _on_player_joined(id: int, name: String):
 	print("Player joined lobby: ", name)
 	_update_player_list()
+	_update_server_info()  # Update server info to show new player count and team status
 
 func _on_player_left(id: int):
 	print("Player left lobby: ", id)
 	_update_player_list()
+	_update_server_info()  # Update server info to show new player count and team status
 
 func _on_start_game_pressed():
 	if is_host:
+		# Check if game can start (team balance, etc.)
+		if not _can_start_game():
+			return
+		
 		# Start the game for all players
 		_start_game.rpc()
+
+func _can_start_game() -> bool:
+	"""Check if the game can start based on current conditions"""
+	if not network_manager:
+		return false
+	
+	var info = network_manager.get_server_info()
+	var game_mode = info.get("game_mode", "FREE-FOR-ALL")
+	var current_players = info.get("current_players", 1)
+	
+	match game_mode:
+		"TEAM DEATHMATCH":
+			if current_players < 2:
+				print("Cannot start team game: Need at least 2 players")
+				return false
+			if current_players % 2 != 0:
+				print("Cannot start team game: Need even number of players for balanced teams")
+				return false
+			return true
+		"FREE-FOR-ALL":
+			return current_players >= 1
+		_:
+			return true
 
 func _on_leave_lobby_pressed():
 	# Disconnect from server

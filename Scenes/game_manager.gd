@@ -22,6 +22,9 @@ var is_host: bool = false
 var tank_scene = preload("res://Scenes/Actors/tank.tscn")
 
 func _ready():
+	print("=== GAMEMANAGER _READY ===")
+	print("GameManager script loaded successfully")
+	print("Available methods include: set_game_mode, start_game, spawn_player")
 	# Add to group for easy access
 	add_to_group("game_manager")
 	
@@ -34,6 +37,7 @@ func _ready():
 	
 	# Check if we're the host
 	is_host = multiplayer.is_server()
+	print("GameManager is_host: ", is_host)
 	
 	if is_host:
 		# Start the game for all players
@@ -73,11 +77,17 @@ func _find_spawn_areas_recursive(node: Node):
 		_find_spawn_areas_recursive(child)
 
 func set_game_mode(mode: String):
+	print("=== GAMEMANAGER SET_GAME_MODE CALLED ===")
+	print("Setting game mode to: ", mode)
 	game_mode = mode
 	print("Game mode set to: ", game_mode)
 
 func start_game():
+	print("=== GAMEMANAGER START_GAME CALLED ===")
+	print("Is host: ", is_host)
+	print("Game mode: ", game_mode)
 	if not is_host:
+		print("Not host, skipping game start")
 		return
 	
 	print("Starting game with mode: ", game_mode)
@@ -92,8 +102,11 @@ func start_game():
 	_assign_teams_and_colors(connected_players)
 	
 	# Spawn players
+	print("=== SPAWNING PLAYERS ===")
 	for player_id in connected_players:
+		print("Spawning player: ", player_id)
 		spawn_player(player_id)
+		print("spawn_player called for player: ", player_id)
 	
 	game_started.emit()
 
@@ -134,8 +147,14 @@ func _assign_ffa_mode(player_ids: Array):
 			"tank_node": null
 		}
 
-@rpc("any_peer", "call_local")
+@rpc("any_peer", "reliable", "call_local")
 func spawn_player(player_id: int):
+	print("=== SPAWN_PLAYER CALLED ===")
+	print("Player ID: ", player_id)
+	print("Is Host: ", is_host)
+	print("Current Multiplayer ID: ", multiplayer.get_unique_id())
+	print("Players dict has player: ", player_id in players)
+	
 	if player_id in players:
 		var player_data = players[player_id]
 		
@@ -225,57 +244,71 @@ func _spawn_existing_player_locally(player_id: int, player_data: Dictionary):
 	print("Locally spawned existing player ", player_id, " with color ", player_data.color, " at position ", spawn_position)
 
 func _on_player_connected(id: int):
+	print("=== GameManager: Player connected: ", id)
 	if is_host:
-		print("Player ", id, " connected to active game")
-		
-		# First, sync all existing players to the new client
-		for existing_player_id in players.keys():
-			if existing_player_id != id and existing_player_id in players:
-				var existing_data = players[existing_player_id]
-				_sync_existing_player_to_client.rpc_id(id, existing_player_id, existing_data)
-		
-		# Assign team/color for the new player
-		var color_index = players.size() % team_colors.size()
-		
-		var new_player_data
-		match game_mode:
-			"TEAM DEATHMATCH", "TEAM":
-				var team = "Team A" if players.size() % 2 == 0 else "Team B"
-				var team_color = team_colors[0] if team == "Team A" else team_colors[1]
-				new_player_data = {
-					"id": id,
-					"team": team,
-					"color": team_color,
-					"tank_node": null
-				}
-			_:
-				# Default to FFA
-				new_player_data = {
-					"id": id,
-					"team": "Individual", 
-					"color": team_colors[color_index],
-					"tank_node": null
-				}
-		
-		# Add to local players dict
-		players[id] = new_player_data
-		
-		# Send the new player's data to the client so they can spawn themselves
-		_sync_new_player_to_client.rpc_id(id, id, new_player_data)
-		
-		# Spawn the new player on the server and notify all OTHER clients
-		spawn_player(id)
-		print("Mid-game player ", id, " spawned with color ", players[id].color)
+		# If game is already active, add the new player and spawn them
+		if is_game_active():
+			print("Game in progress, adding new player to game: ", id)
+			
+			# Add new player to players dictionary
+			var color = team_colors[(players.size()) % team_colors.size()]
+			players[id] = {
+				"id": id,
+				"team": "Individual",
+				"color": color,
+				"tank_node": null
+			}
+			
+			# Sync current state to new client (including existing players)
+			_sync_game_state_to_client.rpc_id(id, players, game_mode)
+			
+			# Spawn the new player on the host
+			print("Spawning new player on host: ", id)
+			spawn_player(id)
+			
+			# Tell all existing clients to spawn the new player too
+			print("Telling clients to spawn new player: ", id)
+			for peer_id in multiplayer.get_peers():
+				if peer_id != id:  # Don't tell the new client to spawn themselves again
+					_spawn_new_player_for_client.rpc_id(peer_id, id, players[id])
+		else:
+			print("Game not active yet, player will be added when game starts")
 
 func _on_player_disconnected(id: int):
-	print("Player ", id, " disconnected")
-	
-	# Remove player data and tank
+	print("=== GameManager: Player disconnected: ", id)
+	# Remove player from game if they existed
 	if id in players:
 		var player_data = players[id]
-		if player_data.tank_node and is_instance_valid(player_data.tank_node):
+		if player_data.tank_node:
 			player_data.tank_node.queue_free()
 		players.erase(id)
+		print("Removed player ", id, " from game")
+
+# RPC to sync entire game state to new client
+@rpc("call_remote", "reliable")
+func _sync_game_state_to_client(player_data: Dictionary, mode: String):
+	print("=== SYNCING GAME STATE FROM SERVER ===")
+	print("Received players data: ", player_data)
+	print("Game mode: ", mode)
+	
+	# Set our game mode
+	game_mode = mode
+	
+	# Clear existing players
+	players.clear()
+	
+	# Add all players from server and spawn them all
+	for player_id in player_data:
+		players[player_id] = player_data[player_id].duplicate()
+		# Don't include tank_node reference as it's not serializable
+		players[player_id].tank_node = null
+		
+		# Spawn ALL players locally (including self)
+		print("Spawning player locally: ", player_id)
+		call_deferred("spawn_player", player_id)
+	
+	print("Game state synchronized")
+
 
 func get_player_data(player_id: int) -> Dictionary:
 	return players.get(player_id, {})
@@ -310,6 +343,60 @@ func _sync_new_player_to_client(player_id: int, player_data: Dictionary):
 	# Spawn myself locally
 	_spawn_existing_player_locally(player_id, player_data)
 	print("Spawned myself (", player_id, ") locally")
+
+func can_start_game() -> bool:
+	"""Check if the game can start based on current players and game mode"""
+	var connected_players = [multiplayer.get_unique_id()]
+	connected_players.append_array(multiplayer.get_peers())
+	
+	match game_mode:
+		"TEAM", "TEAM DEATHMATCH":
+			# For team modes, we need at least 2 players and equal teams
+			if connected_players.size() < 2:
+				print("Cannot start team game: Need at least 2 players")
+				return false
+			
+			# Team games should have an even number of players for balanced teams
+			if connected_players.size() % 2 != 0:
+				print("Cannot start team game: Need even number of players for balanced teams")
+				return false
+			
+			return true
+		
+		"FREE-FOR-ALL":
+			# FFA can start with any number of players (minimum 1)
+			return connected_players.size() >= 1
+		
+		_:
+			return true
+
+func get_team_balance_info() -> Dictionary:
+	"""Get information about current team balance"""
+	var connected_players = [multiplayer.get_unique_id()]
+	connected_players.append_array(multiplayer.get_peers())
+	var total_players = connected_players.size()
+	
+	match game_mode:
+		"TEAM", "TEAM DEATHMATCH":
+			var team_a_count = (total_players + 1) / 2  # Ceiling division
+			var team_b_count = total_players / 2        # Floor division
+			
+			return {
+				"total_players": total_players,
+				"team_a_count": team_a_count,
+				"team_b_count": team_b_count,
+				"is_balanced": total_players % 2 == 0,
+				"needs_more_players": total_players < 2
+			}
+		
+		"FREE-FOR-ALL":
+			return {
+				"total_players": total_players,
+				"can_start": total_players >= 1
+			}
+		
+		_:
+			return {"total_players": total_players}
 
 func _find_safe_spawn_position() -> Vector2:
 	"""Find a safe spawn position from available spawn areas."""
@@ -385,13 +472,13 @@ func _get_random_position_in_area(area: Area2D) -> Vector2:
 
 func _is_spawn_position_safe(position: Vector2) -> bool:
 	"""Check if a spawn position is safe (no walls, no other players)."""
-	# Get world from the current scene (which should be a Node2D)
-	var scene_root = get_tree().current_scene
-	if not scene_root is CanvasItem:
-		print("Warning: Scene root is not a CanvasItem, cannot perform physics queries")
+	# Get world from the map scene (parent of GameManager)
+	var map_scene = get_parent()
+	if not map_scene is CanvasItem:
+		print("Warning: Map scene is not a CanvasItem, cannot perform physics queries")
 		return true
 	
-	var space_state = scene_root.get_world_2d().direct_space_state
+	var space_state = map_scene.get_world_2d().direct_space_state
 	
 	# Check for walls using physics raycast in multiple directions
 	var directions = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT,
@@ -419,13 +506,13 @@ func _is_spawn_position_safe(position: Vector2) -> bool:
 
 func _push_out_of_walls(position: Vector2) -> Vector2:
 	"""Try to push a position out of walls if it's inside them."""
-	# Get world from the current scene (which should be a Node2D)
-	var scene_root = get_tree().current_scene
-	if not scene_root is CanvasItem:
-		print("Warning: Scene root is not a CanvasItem, cannot perform physics queries")
+	# Get world from the map scene (parent of GameManager)
+	var map_scene = get_parent()
+	if not map_scene is CanvasItem:
+		print("Warning: Map scene is not a CanvasItem, cannot perform physics queries")
 		return position
 	
-	var space_state = scene_root.get_world_2d().direct_space_state
+	var space_state = map_scene.get_world_2d().direct_space_state
 	var tank_radius = 32.0
 	var max_push_attempts = 10
 	var push_distance = 16.0
@@ -463,3 +550,21 @@ func _push_out_of_walls(position: Vector2) -> Vector2:
 			current_pos += Vector2(cos(random_angle), sin(random_angle)) * push_distance
 	
 	return current_pos
+
+func is_game_active() -> bool:
+	"""Check if the game is currently active (players have been spawned)"""
+	return players.size() > 0 and players.values().any(func(p): return p.tank_node != null)
+
+# RPC to tell existing clients to spawn a new player
+@rpc("call_remote", "reliable")
+func _spawn_new_player_for_client(player_id: int, player_data: Dictionary):
+	print("=== SPAWNING NEW PLAYER FOR CLIENT ===")
+	print("Player ID: ", player_id)
+	print("Player data: ", player_data)
+	
+	# Add new player to local players dict
+	players[player_id] = player_data.duplicate()
+	players[player_id].tank_node = null
+	
+	# Spawn the new player locally
+	spawn_player(player_id)

@@ -7,8 +7,9 @@ extends RigidBody2D
 
 var target_position = Vector2.ZERO
 var shooter_node = null
+var ink_color = Color.WHITE  # Default ink color
 
-signal paint_splat(global_pos, team_id, splat_radius)
+signal paint_splat(global_pos, color, splat_radius)
 
 func _ready():
 	gravity_scale = gravity_strength
@@ -29,7 +30,7 @@ func _on_collision(body):
 	elif body != shooter_node:
 		linear_velocity = Vector2.ZERO
 		anim.play("Shoot_Splatter")
-		emit_signal("paint_splat", global_position, 1, 10)
+		emit_signal("paint_splat", global_position, ink_color, 10)
 
 func _on_animation_finished(anim_name):
 	if anim_name == "Shoot_Fire":
@@ -40,3 +41,8 @@ func _on_animation_finished(anim_name):
 func setup(pos, shooter):
 	target_position = pos
 	shooter_node = shooter
+
+func set_ink_color(color: Color):
+	ink_color = color
+	# Also apply the color to the projectile visual
+	modulate = color

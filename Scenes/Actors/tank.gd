@@ -112,8 +112,13 @@ func jump():
 @rpc("any_peer", "call_local")
 func shoot():
 	var shot_instance = shot.instantiate()
-	shot_instance.setup(get_global_mouse_position(),self)
+	shot_instance.setup(get_global_mouse_position(), self)
 	shot_instance.global_position = $Body/Cannon/GunPoint.global_position
+	
+	# Set the ink color to match tank color (slightly lighter)
+	var ink_color = modulate.lightened(0.3)  # Make it 30% lighter
+	shot_instance.set_ink_color(ink_color)
+	
 	get_tree().get_root().add_child(shot_instance)
 	if paintable_map:
 		shot_instance.connect("paint_splat", Callable(paintable_map, "on_paint_splat"))

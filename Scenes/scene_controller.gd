@@ -46,6 +46,8 @@ func change_scene(scene_name: String):
 	print("Attempting to change to scene: ", scene_name)
 	print("Current scene: ", current_scene_name)
 	print("Scene container visible: ", scene_container.visible)
+	print("Multiplayer ID: ", multiplayer.get_unique_id())
+	print("Connected peers: ", multiplayer.get_peers())
 	
 	# Remove current scene if it exists
 	if current_scene:
@@ -252,14 +254,19 @@ func _on_create_lobby_pressed():
 	var map_name = "MAP 1"
 	var max_players = 4
 	
-	if game_mode_option and game_mode_option.selected > 0:
+	if game_mode_option:
 		game_mode = game_mode_option.get_item_text(game_mode_option.selected)
 	
-	if map_option and map_option.selected > 0:
+	if map_option:
 		map_name = map_option.get_item_text(map_option.selected)
 	
 	if player_limit_option:
 		max_players = player_limit_option.selected + 2  # Options start from 2 players
+	
+	print("=== CREATING SERVER ===")
+	print("Game Mode: ", game_mode)
+	print("Map: ", map_name)
+	print("Max Players: ", max_players)
 	
 	var server_name = "Player's Lobby"
 	
@@ -292,16 +299,39 @@ func change_scene_with_game_mode(scene_name: String, game_mode: String):
 func _set_game_mode_deferred(game_mode: String, scene_name: String):
 	print("Setting game mode deferred: ", game_mode, " for scene: ", scene_name)
 	
+	# Wait a few frames to ensure the scene is fully loaded
+	await get_tree().process_frame
+	await get_tree().process_frame
+	
 	if current_scene:
 		print("Current scene exists, looking for GameManager...")
 		var game_manager = current_scene.get_node_or_null("GameManager")
 		if game_manager:
-			print("Found GameManager, checking for set_game_mode method...")
+			print("Found GameManager, checking details...")
+			print("GameManager script: ", game_manager.get_script())
+			print("GameManager class: ", game_manager.get_class())
+			print("GameManager has set_game_mode: ", game_manager.has_method("set_game_mode"))
+			
+			# Try calling the method directly
 			if game_manager.has_method("set_game_mode"):
+				print("Calling set_game_mode(", game_mode, ")")
 				game_manager.set_game_mode(game_mode)
 				print("Set game mode to: ", game_mode, " for scene: ", scene_name)
 			else:
 				print("GameManager found but no set_game_mode method")
+				print("Available methods: ")
+				for method in game_manager.get_method_list():
+					if not method.name.begins_with("_"):  # Skip private methods
+						print("  - ", method.name)
+				
+				# Try calling it by name directly as fallback
+				print("Trying to call set_game_mode directly...")
+				if game_manager.has_signal("game_started"):
+					print("GameManager has game_started signal - script is loaded")
+				
+				# Try using call() method as fallback
+				var result = game_manager.call("set_game_mode", game_mode)
+				print("Called set_game_mode via call(), result: ", result)
 		else:
 			print("Warning: GameManager not found in scene: ", scene_name)
 			print("Available children: ")

@@ -5,6 +5,7 @@ signal server_list_updated(servers: Array)
 signal connected_to_server(success: bool)
 signal player_joined(id: int, name: String)
 signal player_left(id: int)
+signal server_info_updated
 
 const DEFAULT_PORT = 7000
 const MAX_PLAYERS = 10
@@ -45,13 +46,54 @@ func create_server(server_name: String, game_mode: String, map_name: String, max
 	print("Port: ", port)
 	print("Max Players: ", max_players)
 	
-	multiplayer_peer = ENetMultiplayerPeer.new()
-	var error = multiplayer_peer.create_server(port, max_players)
+	# First, properly disconnect any existing server/client connection
+	if multiplayer_peer:
+		print("Disconnecting existing multiplayer peer...")
+		multiplayer_peer.close()
+		multiplayer_peer = null
 	
-	print("ENet create_server result: ", error)
+	if multiplayer.multiplayer_peer:
+		print("Clearing existing multiplayer.multiplayer_peer...")
+		multiplayer.multiplayer_peer = null
 	
-	if error != OK:
-		print("Failed to create server on port ", port, ": ", error)
+	# Stop any existing UDP discovery server
+	_stop_discovery_server()
+	
+	# Clear any existing server info
+	server_info.clear()
+	is_server = false
+	
+	# Wait longer to ensure port is released
+	await get_tree().create_timer(1.0).timeout
+	
+	# Try different ports if the default one fails
+	var attempts = 0
+	var current_port = port
+	while attempts < 5:
+		print("Attempting to create server on port: ", current_port)
+		multiplayer_peer = ENetMultiplayerPeer.new()
+		var error = multiplayer_peer.create_server(current_port, max_players)
+		
+		print("ENet create_server result: ", error)
+		
+		if error == OK:
+			print("Successfully created server on port: ", current_port)
+			port = current_port  # Update port to the one that worked
+			break
+		elif error == ERR_ALREADY_IN_USE:
+			print("Port ", current_port, " is in use, trying next port...")
+			current_port += 1
+			attempts += 1
+			multiplayer_peer.close()
+			multiplayer_peer = null
+			await get_tree().create_timer(0.2).timeout
+		else:
+			print("Failed to create server on port ", current_port, ": ", error)
+			server_created.emit(false)
+			return false
+	
+	if attempts >= 5:
+		print("Failed to find available port after 5 attempts")
 		server_created.emit(false)
 		return false
 	
@@ -292,13 +334,29 @@ func _on_peer_connected(id: int):
 	print("All connected peers: ", multiplayer.get_peers())
 	
 	if is_server:
+		# Check if we're at max capacity
+		var max_players = server_info.get("max_players", 4)
+		var current_players = server_info.get("current_players", 1)
+		
+		if current_players >= max_players:
+			print("Server at capacity, disconnecting player ", id)
+			multiplayer_peer.disconnect_peer(id)
+			return
+		
+		# For now, don't enforce team balance during connection - handle in lobby
+		# TODO: Re-enable team balance enforcement once core multiplayer issues are resolved
+		
 		server_info.current_players += 1
 		print("Updated server player count: ", server_info.current_players)
 		
 		# Tell the new client what scene to join
 		_send_scene_info_to_new_client(id)
+		
+		# Send complete server info to the new client
+		_sync_server_info_to_client.rpc_id(id, server_info)
 	
 	player_joined.emit(id, "Player " + str(id))
+	server_info_updated.emit()
 	print("Emitted player_joined signal")
 
 func _on_peer_disconnected(id: int):
@@ -311,6 +369,7 @@ func _on_peer_disconnected(id: int):
 		print("Updated server player count: ", server_info.current_players)
 	
 	player_left.emit(id)
+	server_info_updated.emit()
 	print("Emitted player_left signal")
 
 func _on_connected_to_server():
@@ -334,11 +393,13 @@ func _notify_client_scene(scene_name: String, game_mode: String = ""):
 	print("=== RECEIVED SCENE NOTIFICATION FROM SERVER ===")
 	print("Scene: ", scene_name)
 	print("Game Mode: ", game_mode)
+	print("Current multiplayer ID: ", multiplayer.get_unique_id())
 	print("Current scene controller exists: ", get_tree().get_first_node_in_group("scene_controller") != null)
 	
 	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
 	if scene_controller:
-		print("Scene controller found, changing scene...")
+		print("Scene controller found, current scene: ", scene_controller.current_scene_name)
+		print("Changing to requested scene...")
 		if game_mode != "":
 			print("Calling change_scene_with_game_mode(", scene_name, ", ", game_mode, ")")
 			scene_controller.change_scene_with_game_mode(scene_name, game_mode)
@@ -349,6 +410,16 @@ func _notify_client_scene(scene_name: String, game_mode: String = ""):
 	else:
 		print("ERROR: Could not find scene controller")
 
+# RPC call to sync server info to client
+@rpc("call_remote", "reliable")
+func _sync_server_info_to_client(info: Dictionary):
+	print("=== RECEIVED SERVER INFO FROM SERVER ===")
+	print("Server info received: ", info)
+	server_info = info
+	print("Local server_info updated: ", server_info)
+	# Emit signal so UI can update
+	server_info_updated.emit()
+
 # Call this when a new player connects to tell them what scene to join
 func _send_scene_info_to_new_client(client_id: int):
 	if not is_server:
@@ -357,19 +428,28 @@ func _send_scene_info_to_new_client(client_id: int):
 	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
 	if scene_controller:
 		var current_scene_name = scene_controller.current_scene_name
-		print("Telling new client ", client_id, " to join scene: ", current_scene_name)
+		print("=== SENDING SCENE INFO TO NEW CLIENT ===")
+		print("Client ID: ", client_id)
+		print("Server current scene: ", current_scene_name)
+		print("Server info: ", server_info)
+		print("Scene controller current scene name: ", current_scene_name)
 		
 		# Check if we're in a game scene
 		if current_scene_name.begins_with("map_"):
 			# Send them to the active game with the current game mode
 			var game_mode = server_info.get("game_mode", "FREE-FOR-ALL")
+			print("Sending client to game scene: ", current_scene_name, " with mode: ", game_mode)
 			_notify_client_scene.rpc_id(client_id, current_scene_name, game_mode)
 		else:
 			# Send them to lobby
+			print("Sending client to lobby")
 			_notify_client_scene.rpc_id(client_id, "lobby")
 
 # Utility functions
 func get_server_info() -> Dictionary:
+	# Update current player count dynamically
+	if is_server and server_info.size() > 0:
+		server_info.current_players = 1 + multiplayer.get_peers().size()
 	return server_info
 
 func get_available_servers() -> Array[Dictionary]:
