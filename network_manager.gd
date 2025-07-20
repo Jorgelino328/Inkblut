@@ -69,7 +69,8 @@ func create_server(server_name: String, game_mode: String, map_name: String, max
 	# Try different ports if the default one fails
 	var attempts = 0
 	var current_port = port
-	while attempts < 5:
+	var max_attempts = 50  # Try many more ports
+	while attempts < max_attempts:
 		print("Attempting to create server on port: ", current_port)
 		multiplayer_peer = ENetMultiplayerPeer.new()
 		var error = multiplayer_peer.create_server(current_port, max_players)
@@ -80,20 +81,18 @@ func create_server(server_name: String, game_mode: String, map_name: String, max
 			print("Successfully created server on port: ", current_port)
 			port = current_port  # Update port to the one that worked
 			break
-		elif error == ERR_ALREADY_IN_USE:
-			print("Port ", current_port, " is in use, trying next port...")
+		else:
+			print("Port ", current_port, " failed with error ", error, ", trying next port...")
 			current_port += 1
 			attempts += 1
-			multiplayer_peer.close()
-			multiplayer_peer = null
-			await get_tree().create_timer(0.2).timeout
-		else:
-			print("Failed to create server on port ", current_port, ": ", error)
-			server_created.emit(false)
-			return false
+			if multiplayer_peer:
+				multiplayer_peer.close()
+				multiplayer_peer = null
+			# Shorter wait time for faster port scanning
+			await get_tree().create_timer(0.1).timeout
 	
-	if attempts >= 5:
-		print("Failed to find available port after 5 attempts")
+	if attempts >= max_attempts:
+		print("Failed to find available port after ", max_attempts, " attempts")
 		server_created.emit(false)
 		return false
 	
@@ -188,19 +187,28 @@ func start_server_discovery():
 func _start_discovery_server(server_port: int = DEFAULT_PORT):
 	print("=== STARTING UDP DISCOVERY SERVER ===")
 	udp_server = UDPServer.new()
-	# Use a different port for UDP discovery to avoid conflicts
+	
+	# Try multiple UDP discovery ports if needed
 	var discovery_port = server_port + 1000
-	print("Attempting to start UDP server on port: ", discovery_port)
+	var udp_attempts = 0
+	var max_udp_attempts = 20
 	
-	var error = udp_server.listen(discovery_port)
-	if error != OK:
-		print("ERROR: Failed to start UDP discovery server on port ", discovery_port, ": ", error)
-		return
+	while udp_attempts < max_udp_attempts:
+		print("Attempting to start UDP server on port: ", discovery_port)
+		var error = udp_server.listen(discovery_port)
+		
+		if error == OK:
+			print("SUCCESS: UDP discovery server started on port ", discovery_port)
+			print("Server will respond to DISCOVER_SERVERS requests")
+			broadcast_timer.start()
+			print("Broadcast timer started with interval: ", broadcast_timer.wait_time, " seconds")
+			return
+		else:
+			print("UDP port ", discovery_port, " failed with error ", error, ", trying next port...")
+			discovery_port += 1
+			udp_attempts += 1
 	
-	print("SUCCESS: UDP discovery server started on port ", discovery_port)
-	print("Server will respond to DISCOVER_SERVERS requests")
-	broadcast_timer.start()
-	print("Broadcast timer started with interval: ", broadcast_timer.wait_time, " seconds")
+	print("ERROR: Failed to find available UDP discovery port after ", max_udp_attempts, " attempts")
 
 func _stop_discovery_server():
 	if udp_server:
