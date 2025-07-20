@@ -99,19 +99,41 @@ func _on_timer_updated(time_left: float):
 
 func _on_coverage_updated(coverage_data: Dictionary):
 	"""Update coverage display for local player"""
-	if not local_player or not is_instance_valid(local_player) or not coverage_data.has("percentages"):
+	print("HUD: Coverage update received: ", coverage_data)
+	
+	if not local_player or not is_instance_valid(local_player):
+		print("HUD: Cannot update coverage - no valid local_player")
+		return
+		
+	if not coverage_data.has("percentages"):
+		print("HUD: Cannot update coverage - no percentages in data")
 		return
 	
 	var player_color = local_player.modulate
 	var player_coverage = 0.0
 	
+	print("HUD: Looking for coverage for local player color: ", player_color)
+	print("HUD: Available colors in coverage data:")
+	for color in coverage_data.percentages:
+		print("  Color: ", color, " Coverage: ", coverage_data.percentages[color])
+	
 	# Find coverage for our color
+	var found_match = false
 	for color in coverage_data.percentages:
 		if color.is_equal_approx(player_color):
 			player_coverage = coverage_data.percentages[color]
+			found_match = true
+			print("HUD: Found matching color, coverage: ", player_coverage)
 			break
 	
-	coverage_label.text = "Coverage: %.1f%%" % player_coverage
+	if not found_match:
+		print("HUD: No matching color found! Using 0.0%")
+	
+	var coverage_text = "Coverage: %.1f%%" % player_coverage
+	coverage_label.text = coverage_text
+	print("HUD: Set coverage_label.text to: ", coverage_text)
+	print("HUD: coverage_label node: ", coverage_label)
+	print("HUD: coverage_label visible: ", coverage_label.visible if coverage_label else "null")
 	
 	# Color based on performance
 	if player_coverage > 40:
@@ -159,14 +181,6 @@ func update_timer(time_left: float):
 	var minutes = int(time_left) / 60
 	var seconds = int(time_left) % 60
 	timer_label.text = "%02d:%02d" % [minutes, seconds]
-
-func update_coverage(coverage_data: Dictionary):
-	"""Update area coverage display"""
-	if coverage_data.has("local_player"):
-		var local_coverage = coverage_data["local_player"]
-		coverage_label.text = "Coverage: %.1f%%" % (local_coverage * 100.0)
-	else:
-		coverage_label.text = "Coverage: 0.0%"
 
 func update_health(health: int, max_health: int):
 	"""Update health display"""

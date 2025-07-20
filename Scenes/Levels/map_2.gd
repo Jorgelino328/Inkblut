@@ -43,8 +43,9 @@ func _on_game_timer_updated(time_left: float):
 
 func _on_coverage_updated(coverage_data: Dictionary):
 	"""Update the coverage display"""
-	if game_hud:
-		game_hud.update_coverage(coverage_data)
+	# Coverage updates are now handled directly by HUD via GameManager signals
+	# No need to update HUD manually
+	pass
 
 func _on_player_died(player_id: int):
 	"""Handle player death"""

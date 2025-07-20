@@ -183,17 +183,7 @@ func _on_game_timer_timeout():
 
 func _on_coverage_update_timeout():
 	"""Called periodically to update coverage data."""
-	var coverage_data = {}
-	
-	# Calculate coverage for each team
-	for player_id in players.keys():
-		var player_data = players[player_id]
-		if player_data.tank_node and is_instance_valid(player_data.tank_node):
-			var team = player_data.team
-			if not coverage_data.has(team):
-				coverage_data[team] = 0
-			# Add player's coverage area (dummy value for now)
-			coverage_data[team] += 1 
+	var coverage_data = _calculate_actual_coverage()
 	
 	# Emit coverage update signal
 	coverage_updated.emit(coverage_data)
@@ -315,9 +305,11 @@ func _sync_timer_update(time_left: float):
 func _calculate_and_broadcast_coverage():
 	"""Calculate ink coverage and broadcast to all players"""
 	if not is_host or not paintable_tilemap:
+		print("Coverage calculation skipped - is_host: ", is_host, ", tilemap: ", paintable_tilemap != null)
 		return
 		
 	var coverage_data = _calculate_ink_coverage()
+	print("Coverage calculation result: ", coverage_data)
 	_sync_coverage_update.rpc(coverage_data)
 	coverage_updated.emit(coverage_data)
 
@@ -327,50 +319,44 @@ func _sync_coverage_update(coverage_data: Dictionary):
 	coverage_updated.emit(coverage_data)
 
 func _calculate_ink_coverage() -> Dictionary:
-	"""Calculate ink coverage for each team/player"""
+	"""Calculate ink coverage for each team/player using the paintable walls tracking"""
 	if not paintable_tilemap:
+		print("Coverage calc failed: no tilemap")
 		return {}
 	
-	var coverage_count: Dictionary = {}
-	var total_paintable_tiles = 0
-	
-	# Initialize counters for each team/player
+	# Get player colors
+	var player_colors: Dictionary = {}
 	for player_id in players:
+		player_colors[player_id] = players[player_id].color
+	
+	# Get coverage data from the paintable tilemap
+	var coverage_data = paintable_tilemap.get_coverage_data(player_colors)
+	
+	print("GameManager: Coverage data received: ", coverage_data)
+	
+	return coverage_data
+
+func _calculate_actual_coverage() -> Dictionary:
+	"""Calculate actual coverage from painted tiles and convert to team-based data"""
+	var coverage_data = _calculate_ink_coverage()
+	
+	if coverage_data.is_empty():
+		return {}
+	
+	# Convert to team-based coverage for HUD display
+	var team_coverage: Dictionary = {}
+	for player_id in players:
+		var team = players[player_id].team
 		var color = players[player_id].color
-		coverage_count[color] = 0
+		
+		if not team_coverage.has(team):
+			team_coverage[team] = 0.0
+		
+		if coverage_data.percentages.has(color):
+			team_coverage[team] += coverage_data.percentages[color]
 	
-	# Count painted tiles by iterating through the tilemap
-	var used_rect = paintable_tilemap.get_used_rect()
-	
-	for x in range(used_rect.position.x, used_rect.position.x + used_rect.size.x):
-		for y in range(used_rect.position.y, used_rect.position.y + used_rect.size.y):
-			var coords = Vector2i(x, y)
-			var tile_data = paintable_tilemap.get_cell_tile_data(0, coords)
-			
-			if tile_data and tile_data.get_custom_data("is_paintable"):
-				total_paintable_tiles += 1
-				var tile_color = tile_data.modulate
-				
-				# Find matching player color
-				for player_id in players:
-					var player_color = players[player_id].color
-					if tile_color.is_equal_approx(player_color):
-						coverage_count[player_color] += 1
-						break
-	
-	# Calculate percentages
-	var coverage_percentages: Dictionary = {}
-	for color in coverage_count:
-		if total_paintable_tiles > 0:
-			coverage_percentages[color] = (coverage_count[color] * 100.0) / total_paintable_tiles
-		else:
-			coverage_percentages[color] = 0.0
-	
-	return {
-		"counts": coverage_count,
-		"percentages": coverage_percentages,
-		"total_tiles": total_paintable_tiles
-	}
+	print("GameManager: Team coverage data: ", team_coverage)
+	return team_coverage
 
 func handle_player_death(player_id: int):
 	"""Handle when a player dies"""

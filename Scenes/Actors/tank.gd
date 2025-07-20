@@ -27,6 +27,7 @@ var damage_cooldown_time: float = 0.1  # 100ms cooldown between damage instances
 var hit_flash_timer: float = 0.0
 var hit_flash_duration: float = 0.2  # 200ms flash duration
 var last_mouse_position: Vector2 = Vector2.ZERO  # Store window-specific mouse position
+var team_color: Color = Color.WHITE  # Store the original team/player color
 
 func _ready():
 	# Add to tanks group for discovery
@@ -199,9 +200,8 @@ func shoot():
 	shot_instance.setup(target_position, self)
 	shot_instance.global_position = $Body/Cannon/GunPoint.global_position
 	
-	# Set the ink color to match tank color (slightly lighter)
-	var ink_color = modulate.lightened(0.3)  # Make it 30% lighter
-	shot_instance.set_ink_color(ink_color)
+	# Set the ink color to match exact team color for coverage tracking
+	shot_instance.set_ink_color(team_color)
 	
 	get_tree().get_root().add_child(shot_instance)
 	if paintable_map:
@@ -293,6 +293,8 @@ func _on_hit_floor(body):
 
 func set_tank_color(color: Color):
 	"""Set the tank's color"""
+	# Store the original team color for inkshots
+	team_color = color
 	# Preserve alpha channel when setting color to avoid transparency issues
 	color.a = 1.0
 	modulate = color
