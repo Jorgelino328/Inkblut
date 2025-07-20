@@ -9,16 +9,28 @@ var network_manager: NetworkManager
 var is_host: bool = false
 
 func _ready():
+	print("=== LOBBY READY ===")
+	
 	# Get reference to network manager
 	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
 	if scene_controller:
 		network_manager = scene_controller.network_manager
 		is_host = network_manager.is_hosting()
 		
+		print("Network Manager found: ", network_manager != null)
+		print("Is Host: ", is_host)
+		print("Multiplayer unique ID: ", multiplayer.get_unique_id())
+		print("Connected peers: ", multiplayer.get_peers())
+		
 		# Connect to network manager signals
 		if network_manager:
 			network_manager.player_joined.connect(_on_player_joined)
 			network_manager.player_left.connect(_on_player_left)
+			
+			var server_info = network_manager.get_server_info()
+			print("Server info: ", server_info)
+	else:
+		print("ERROR: No scene controller found!")
 	
 	# Connect UI signals
 	start_game_button.pressed.connect(_on_start_game_pressed)
@@ -26,6 +38,7 @@ func _ready():
 	
 	# Update UI based on role
 	start_game_button.visible = is_host
+	print("Start game button visible: ", is_host)
 	
 	# Update server info
 	_update_server_info()
@@ -42,6 +55,12 @@ func _update_server_info():
 			]
 
 func _update_player_list():
+	print("=== UPDATING PLAYER LIST ===")
+	print("Is Host: ", is_host)
+	print("Multiplayer ID: ", multiplayer.get_unique_id())
+	print("Connected Peers: ", multiplayer.get_peers())
+	print("Player list container children: ", player_list.get_child_count())
+	
 	# Clear existing player labels (except the first one)
 	for i in range(player_list.get_child_count() - 1, 0, -1):
 		player_list.get_child(i).queue_free()
@@ -50,19 +69,25 @@ func _update_player_list():
 	var host_label = player_list.get_child(0) as Label
 	if is_host:
 		host_label.text = "1. Host (You)"
+		print("Set host label to: Host (You)")
 	else:
 		host_label.text = "1. Host"
+		print("Set host label to: Host")
 	
 	# Add other players (this would be expanded with actual multiplayer data)
 	var connected_peers = multiplayer.get_peers()
+	print("Adding ", connected_peers.size(), " connected peers to list")
+	
 	for i in range(connected_peers.size()):
 		var player_label = Label.new()
 		player_label.text = "%d. Player %d" % [i + 2, connected_peers[i]]
-		player_label.theme_override_font_sizes["font_size"] = 24
+		player_label.add_theme_font_size_override("font_size", 24)
 		player_list.add_child(player_label)
+		print("Added player label: ", player_label.text)
 
 func _update_debug_info():
 	# Debug function removed - no longer needed for production
+	pass
 
 func _on_player_joined(id: int, name: String):
 	print("Player joined lobby: ", name)

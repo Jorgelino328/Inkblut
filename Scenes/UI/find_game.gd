@@ -136,30 +136,31 @@ func _create_server_button(server_info: Dictionary):
 	server_container.add_child(button)
 
 func _on_server_selected(server_info: Dictionary):
-	print("Attempting to join server: ", server_info.get("name"))
+	print("=== JOINING SERVER ===")
+	print("Server name: ", server_info.get("name"))
+	print("Server port: ", server_info.get("port"))
+	print("Server info: ", server_info)
 	
 	if network_manager:
 		# Connect to network manager signals for connection
 		if not network_manager.connected_to_server.is_connected(_on_connected_to_server):
 			network_manager.connected_to_server.connect(_on_connected_to_server)
 		
-		print("Connecting to server at 127.0.0.1:", server_info.get("port", 7000))
+		print("Initiating connection to server at 127.0.0.1:", server_info.get("port", 7000))
 		# Try to connect to the server (assuming local network for now)
 		var success = network_manager.connect_to_server("127.0.0.1", server_info.get("port", 7000))
-		if not success:
+		if success:
+			print("Connection initiation successful, waiting for result...")
+		else:
 			print("Failed to initiate connection to server")
+	else:
+		print("ERROR: No network manager available")
 
 func _on_connected_to_server(success: bool):
 	print("Connection attempt result: ", success)
 	if success:
 		print("Successfully joined server!")
-		# Switch to lobby scene
-		var scene_controller = get_tree().get_first_node_in_group("scene_controller")
-		if scene_controller:
-			print("Switching to lobby scene...")
-			scene_controller.change_scene("lobby")
-		else:
-			print("ERROR: Could not find scene controller")
+		# NetworkManager will automatically handle scene transition to lobby
 	else:
 		print("Failed to join server - connection unsuccessful")
 
