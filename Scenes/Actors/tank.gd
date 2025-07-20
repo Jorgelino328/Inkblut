@@ -13,6 +13,7 @@ signal health_changed(health: int, max_health: int)
 var shot = preload("res://Scenes/Projectiles/inkshot.tscn")
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 var player_id: int = 1
+var is_local_player: bool = false  # Track if this is the local player's tank
 
 # Network synchronized variables
 var network_position: Vector2
@@ -25,6 +26,7 @@ var damage_cooldown: float = 0.0
 var damage_cooldown_time: float = 0.1  # 100ms cooldown between damage instances
 var hit_flash_timer: float = 0.0
 var hit_flash_duration: float = 0.2  # 200ms flash duration
+var last_mouse_position: Vector2 = Vector2.ZERO  # Store window-specific mouse position
 
 func _ready():
 	# Add to tanks group for discovery
@@ -32,6 +34,12 @@ func _ready():
 	
 	# Set the player ID based on multiplayer authority
 	player_id = get_multiplayer_authority()
+	
+	# Check if this is the local player's tank
+	is_local_player = is_multiplayer_authority()
+	
+	# Disable animation tracks that control cannon rotation to allow manual control
+	_disable_cannon_rotation_tracks()
 	
 	# Initialize health
 	current_hp = max_hp
@@ -44,6 +52,34 @@ func _ready():
 	network_velocity = velocity
 	network_cannon_rotation = $Body/Cannon.rotation
 	network_body_flip = $Body.flip_h
+	
+	# Initialize mouse position for local player
+	if is_local_player:
+		last_mouse_position = get_viewport().get_mouse_position()
+
+func _disable_cannon_rotation_tracks():
+	"""Disable animation tracks that control cannon rotation"""
+	if anim and anim.has_animation("RESET"):
+		var reset_anim = anim.get_animation("RESET")
+		for track_idx in range(reset_anim.get_track_count()):
+			if reset_anim.track_get_path(track_idx) == NodePath("Body/Cannon:rotation"):
+				reset_anim.track_set_enabled(track_idx, false)
+	
+	if anim and anim.has_animation("Boom"):
+		var boom_anim = anim.get_animation("Boom")
+		for track_idx in range(boom_anim.get_track_count()):
+			if boom_anim.track_get_path(track_idx) == NodePath("Body/Cannon:rotation"):
+				boom_anim.track_set_enabled(track_idx, false)
+
+func _enforce_cannon_rotation():
+	"""Ensure cannon rotation is controlled by code, not animations"""
+	if is_local_player:
+		# Local player: don't interfere, mouse tracking handles this in _handle_local_input
+		pass
+	else:
+		# Remote player: enforce networked rotation
+		if $Body/Cannon.rotation != network_cannon_rotation:
+			$Body/Cannon.rotation = lerp_angle($Body/Cannon.rotation, network_cannon_rotation, 0.3)  # Faster lerp to overcome animation interference
 
 func _physics_process(delta):
 	# Update damage cooldown
@@ -60,12 +96,11 @@ func _physics_process(delta):
 		if hit_flash_timer <= 0:
 			# Flash finished, return to full opacity
 			modulate.a = 1.0
-			print("Hit flash finished for player: ", player_id)
 		
 	if is_dead:
 		return  # Don't process physics if dead
 		
-	if is_multiplayer_authority():
+	if is_local_player:
 		# Local player - process input and movement
 		_handle_local_input(delta)
 		
@@ -81,10 +116,17 @@ func _physics_process(delta):
 	else:
 		# Remote player - interpolate to network position
 		_handle_remote_movement(delta)
+	
+	# FORCE cannon rotation control - override any animation interference
+	_enforce_cannon_rotation()
 
 func _handle_local_input(delta):
-	# Point cannon at mouse
-	$Body/Cannon.look_at(get_viewport().get_mouse_position())
+	# Only allow local player to track mouse
+	if not is_local_player:
+		return
+		
+	# Point cannon at mouse (only for local player)
+	# Mouse tracking is handled in _input() and _update_cannon_aim()
 	
 	# Add the gravity.
 	if not is_on_floor():
@@ -121,7 +163,7 @@ func _handle_remote_movement(delta):
 	global_position = global_position.lerp(network_position, delta * 10.0)
 	velocity = velocity.lerp(network_velocity, delta * 10.0)
 	
-	# Update cannon rotation
+	# Update cannon rotation using networked data (DON'T track mouse for remote players)
 	$Body/Cannon.rotation = lerp_angle($Body/Cannon.rotation, network_cannon_rotation, delta * 15.0)
 	
 	# Update body flip
@@ -149,7 +191,12 @@ func jump():
 @rpc("any_peer", "call_local")
 func shoot():
 	var shot_instance = shot.instantiate()
-	shot_instance.setup(get_global_mouse_position(), self)
+	
+	# Calculate target position based on cannon rotation
+	var cannon_direction = Vector2.RIGHT.rotated($Body/Cannon.rotation)
+	var target_position = $Body/Cannon/GunPoint.global_position + cannon_direction * 1000  # Shoot far ahead
+	
+	shot_instance.setup(target_position, self)
 	shot_instance.global_position = $Body/Cannon/GunPoint.global_position
 	
 	# Set the ink color to match tank color (slightly lighter)
@@ -159,7 +206,6 @@ func shoot():
 	get_tree().get_root().add_child(shot_instance)
 	if paintable_map:
 		shot_instance.connect("paint_splat", Callable(paintable_map, "on_paint_splat"))
-		print("Connected inkshot to paintable map: ", paintable_map.name)
 	else:
 		print("Warning: No paintable_map reference when shooting!")
 
@@ -192,7 +238,6 @@ func take_damage(damage: int):
 	current_hp -= damage
 	# Use custom flash effect instead of animation to avoid transparency issues
 	hit_flash_timer = hit_flash_duration
-	print("Starting hit flash for player: ", player_id)
 	
 	# Emit health_changed signal
 	emit_signal("health_changed", current_hp, max_hp)
@@ -251,4 +296,62 @@ func set_tank_color(color: Color):
 	# Preserve alpha channel when setting color to avoid transparency issues
 	color.a = 1.0
 	modulate = color
-	print("Tank ", player_id, " color set to: ", color)
+
+func _input(event):
+	# Only process input for local player
+	if not is_local_player or is_dead:
+		return
+		
+	# Capture mouse motion events (these should be window-specific)
+	if event is InputEventMouseMotion:
+		last_mouse_position = event.position
+		# Update cannon rotation immediately based on mouse position
+		_update_cannon_aim()
+
+func _update_cannon_aim():
+	# Only for local player
+	if not is_local_player or is_dead:
+		return
+		
+	# Get camera and viewport info
+	var viewport = get_viewport()
+	var camera = viewport.get_camera_2d()
+	
+	var world_mouse_pos: Vector2
+	
+	if camera:
+		# Convert the window-specific mouse position to world coordinates
+		# Account for camera position and zoom
+		var viewport_size = viewport.get_visible_rect().size
+		var screen_center = viewport_size / 2
+		var mouse_offset_from_center = last_mouse_position - screen_center
+		
+		# Apply camera zoom to the offset and add to camera position
+		world_mouse_pos = camera.global_position + mouse_offset_from_center / camera.zoom
+	else:
+		# Fallback without camera
+		var viewport_size = viewport.get_visible_rect().size
+		var viewport_center = viewport_size / 2
+		var mouse_offset = last_mouse_position - viewport_center
+		world_mouse_pos = global_position + mouse_offset
+	
+	# Calculate desired rotation angle
+	var cannon_position = $Body/Cannon.global_position
+	var direction_to_mouse = world_mouse_pos - cannon_position
+	var target_angle = direction_to_mouse.angle()
+	
+	
+	while target_angle > PI:
+		target_angle -= 2 * PI
+	while target_angle < -PI:
+		target_angle += 2 * PI
+	
+	# Now with the corrected angles:
+	if target_angle > 0 and target_angle < PI:  # In the "down" quadrant
+		if target_angle < PI/2:  # Closer to right
+			target_angle = 0  # Snap to right
+		else:  # Closer to left  
+			target_angle = PI  # Snap to left
+	
+	# Set the cannon rotation
+	$Body/Cannon.rotation = target_angle

@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Godot Game",
+			"type": "shell",
+			"command": "godot",
+			"args": [
+				"--path",
+				"/home/jorgelino/Godot/Godot_Projects/Inkblut"
+			],
+			"group": "build",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}
