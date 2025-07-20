@@ -135,7 +135,50 @@ func _on_test_discovery_pressed():
 
 @rpc("call_local", "reliable")
 func _start_game():
-	# Switch to game scene for all players
+	print("=== STARTING GAME ===")
+	
+	# Get the map and game mode info from network manager
+	var map_scene = "test_scene"  # Default fallback
+	var game_mode = "FREE-FOR-ALL"  # Default fallback
+	
+	if network_manager:
+		var info = network_manager.get_server_info()
+		print("Server info: ", info)
+		
+		var selected_map = info.get("map", "MAP 1")
+		game_mode = info.get("game_mode", "FREE-FOR-ALL")
+		
+		print("Selected map from server: ", selected_map)
+		print("Selected game mode from server: ", game_mode)
+		
+		# Map the displayed name to the actual scene
+		match selected_map:
+			"MAP 1":
+				map_scene = "map_1"
+			"MAP 2":
+				map_scene = "map_2"
+			"MAP 3":
+				map_scene = "map_3"
+			_:
+				map_scene = "map_1"  # Default to map_1
+		
+		# Normalize game mode format for GameManager
+		match game_mode:
+			"TEAM DEATHMATCH":
+				game_mode = "TEAM"
+			"FREE-FOR-ALL":
+				game_mode = "FREE-FOR-ALL"
+			_:
+				game_mode = "FREE-FOR-ALL"  # Default
+		
+		print("Final map scene: ", map_scene)
+		print("Final game mode: ", game_mode)
+	
+	# Switch to the correct map scene for all players
 	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
 	if scene_controller:
-		scene_controller.change_scene("test_scene")
+		print("Found scene controller, changing to scene with game mode")
+		# Pass the game mode as additional data
+		scene_controller.change_scene_with_game_mode(map_scene, game_mode)
+	else:
+		print("ERROR: No scene controller found!")

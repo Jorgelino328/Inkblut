@@ -4,23 +4,39 @@ signal scene_changed(scene_name: String)
 
 @onready var scene_container: Control = $SceneContainer
 @onready var network_manager: NetworkManager = $NetworkManager
-var current_scene: Control = null
+var current_scene: Node = null
 
 # Background servers for testing
 var background_servers: Array[NetworkManager] = []
 
-# Scene paths
-const SCENES = {
+# UI scenes that go in the scene_container (Control)
+const UI_SCENES = {
 	"main_menu": "res://Scenes/UI/main_menu.tscn",
 	"mode_select": "res://Scenes/UI/mode_select.tscn", 
 	"find_game": "res://Scenes/UI/find_game.tscn",
 	"custom_match": "res://Scenes/UI/custom_match.tscn",
 	"lobby": "res://Scenes/UI/lobby.tscn",
-	"game_over": "res://Scenes/UI/game_over.tscn",
-	"test_scene": "res://Scenes/test_scene.tscn"
+	"game_over": "res://Scenes/UI/game_over.tscn"
 }
 
+# Game scenes that replace the entire scene tree
+const GAME_SCENES = {
+	"test_scene": "res://Scenes/test_scene.tscn",
+	"map_1": "res://Scenes/Levels/map_1.tscn",
+	"map_2": "res://Scenes/Levels/map_2.tscn",
+	"map_3": "res://Scenes/Levels/map_3.tscn"
+}
+
+# Combined dictionary for backward compatibility (not const so we can modify it)
+var SCENES = {}
+
 func _ready():
+	# Combine the scene dictionaries for backward compatibility
+	for scene_name in UI_SCENES:
+		SCENES[scene_name] = UI_SCENES[scene_name]
+	for scene_name in GAME_SCENES:
+		SCENES[scene_name] = GAME_SCENES[scene_name]
+	
 	# Add to group so other scripts can find this controller
 	add_to_group("scene_controller")
 	
@@ -37,17 +53,54 @@ func _ready():
 		change_scene("main_menu")
 
 func change_scene(scene_name: String):
+	print("Attempting to change to scene: ", scene_name)
+	
 	# Remove current scene if it exists
 	if current_scene:
 		current_scene.queue_free()
 		current_scene = null
 	
-	# Load and instantiate new scene
-	if scene_name in SCENES:
-		var scene_resource = load(SCENES[scene_name])
-		if scene_resource:
-			current_scene = scene_resource.instantiate()
-			scene_container.add_child(current_scene)
+	# Determine if this is a UI scene or game scene
+	var is_ui_scene = scene_name in UI_SCENES
+	var is_game_scene = scene_name in GAME_SCENES
+	
+	if not (is_ui_scene or is_game_scene):
+		print("Scene not found: ", scene_name)
+		return
+	
+	var scene_path = SCENES[scene_name]
+	print("Loading scene from path: ", scene_path)
+	
+	var scene_resource = null
+	
+	# Check if the file exists first
+	if FileAccess.file_exists(scene_path):
+		print("File exists, attempting to load...")
+		scene_resource = ResourceLoader.load(scene_path)
+		
+		if not scene_resource:
+			print("ResourceLoader failed, trying with load() function...")
+			scene_resource = load(scene_path)
+	else:
+		print("ERROR: File does not exist at path: ", scene_path)
+		# Try without the res:// prefix
+		var alt_path = scene_path.replace("res://", "")
+		print("Trying alternative path: ", alt_path)
+		if FileAccess.file_exists(alt_path):
+			scene_resource = load(alt_path)
+	
+	if scene_resource:
+		print("Scene resource loaded successfully")
+		current_scene = scene_resource.instantiate()
+		if current_scene:
+			if is_ui_scene:
+				# UI scenes go in the scene container
+				scene_container.add_child(current_scene)
+				print("UI scene instantiated and added to scene container")
+			elif is_game_scene:
+				# Game scenes replace the entire scene tree
+				get_tree().current_scene.add_child(current_scene)
+				print("Game scene instantiated and added to scene tree")
 			
 			# Connect buttons based on scene type
 			_connect_scene_buttons(scene_name)
@@ -55,9 +108,13 @@ func change_scene(scene_name: String):
 			scene_changed.emit(scene_name)
 			print("Changed to scene: ", scene_name)
 		else:
-			print("Failed to load scene: ", scene_name)
+			print("Failed to instantiate scene: ", scene_name)
 	else:
-		print("Scene not found: ", scene_name)
+		print("Failed to load scene resource: ", scene_path)
+		print("Falling back to test_scene...")
+		# Fallback to test_scene if map loading fails
+		if scene_name.begins_with("map_"):
+			change_scene("test_scene")
 
 func _connect_scene_buttons(scene_name: String):
 	match scene_name:
@@ -73,6 +130,9 @@ func _connect_scene_buttons(scene_name: String):
 			_connect_lobby_buttons()
 		"game_over":
 			_connect_game_over_buttons()
+		"map_1", "map_2", "map_3":
+			# Map scenes don't have buttons to connect
+			print("Map scene loaded: ", scene_name)
 
 func _connect_main_menu_buttons():
 	var play_button = current_scene.get_node_or_null("MenuContainer/PlayButton")
@@ -187,8 +247,8 @@ func _on_create_lobby_pressed():
 	var map_option = current_scene.get_node_or_null("MenuContainer/MapButton")
 	var player_limit_option = current_scene.get_node_or_null("MenuContainer/OptionsContainer/PlayerContainer/OptionButton")
 	
-	var game_mode = "Free-For-All"
-	var map_name = "Map 1"
+	var game_mode = "FREE-FOR-ALL"
+	var map_name = "MAP 1"
 	var max_players = 4
 	
 	if game_mode_option and game_mode_option.selected > 0:
@@ -225,6 +285,24 @@ func go_to_scene(scene_name: String):
 # Function to show game over screen
 func show_game_over():
 	change_scene("game_over")
+
+# Public function for other scripts to change scenes with game mode data
+func change_scene_with_game_mode(scene_name: String, game_mode: String):
+	change_scene(scene_name)
+	
+	# Wait for the scene to be fully ready before setting game mode
+	if current_scene:
+		call_deferred("_set_game_mode_deferred", game_mode, scene_name)
+
+func _set_game_mode_deferred(game_mode: String, scene_name: String):
+	if current_scene:
+		var game_manager = current_scene.get_node_or_null("GameManager")
+		if game_manager and game_manager.has_method("set_game_mode"):
+			game_manager.set_game_mode(game_mode)
+			print("Set game mode to: ", game_mode, " for scene: ", scene_name)
+		else:
+			print("Warning: GameManager not found in scene: ", scene_name)
+			
 
 # Testing functions for command line
 func _start_test_server():
