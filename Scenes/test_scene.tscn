@@ -1,10 +1,13 @@
-[gd_scene load_steps=4 format=3 uid="uid://yay87v1ko81w"]
+[gd_scene load_steps=5 format=3 uid="uid://yay87v1ko81w"]
 
 [ext_resource type="PackedScene" uid="uid://g7evstn6dpjd" path="res://Scenes/Actors/tank.tscn" id="1_lbsgw"]
 [ext_resource type="TileSet" uid="uid://utj8sukqowuk" path="res://Scenes/Levels/test_tileset.tres" id="2_qpu0p"]
 [ext_resource type="Script" path="res://Scenes/TileLogic/paintable_walls.gd" id="3_d8kto"]
+[ext_resource type="PackedScene" uid="uid://c0f5h4jv6q2bw" path="res://Scenes/game_manager.tscn" id="4_game_manager"]
 
 [node name="TestScene" type="Node2D"]
+
+[node name="GameManager" parent="." instance=ExtResource("4_game_manager")]
 
 [node name="ColorRect" type="ColorRect" parent="."]
 offset_left = -10.0

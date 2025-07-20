@@ -5,6 +5,7 @@ signal scene_changed(scene_name: String)
 @onready var scene_container: Control = $SceneContainer
 @onready var network_manager: NetworkManager = $NetworkManager
 var current_scene: Node = null
+var current_scene_name: String = ""
 
 # UI scenes that go in the scene_container (Control)
 const UI_SCENES = {
@@ -41,16 +42,38 @@ func _ready():
 	change_scene("main_menu")
 
 func change_scene(scene_name: String):
+	print("=== SCENE CONTROLLER: CHANGE_SCENE CALLED ===")
 	print("Attempting to change to scene: ", scene_name)
+	print("Current scene: ", current_scene_name)
+	print("Scene container visible: ", scene_container.visible)
 	
 	# Remove current scene if it exists
 	if current_scene:
+		print("Removing current scene: ", current_scene.name)
 		current_scene.queue_free()
 		current_scene = null
+	
+	# Also clean up any game scenes that might be siblings to this controller
+	if get_parent():
+		for child in get_parent().get_children():
+			if child != self and child.name in ["map_1", "map_2", "map_3", "test_scene"]:
+				print("Cleaning up old game scene: ", child.name)
+				child.queue_free()
 	
 	# Determine if this is a UI scene or game scene
 	var is_ui_scene = scene_name in UI_SCENES
 	var is_game_scene = scene_name in GAME_SCENES
+	
+	print("Is UI scene: ", is_ui_scene)
+	print("Is game scene: ", is_game_scene)
+	
+	# Show/hide UI container based on scene type
+	if is_ui_scene:
+		scene_container.visible = true
+		print("Set scene container visible: true")
+	elif is_game_scene:
+		scene_container.visible = false
+		print("Set scene container visible: false")
 	
 	if not (is_ui_scene or is_game_scene):
 		print("Scene not found: ", scene_name)
@@ -86,13 +109,23 @@ func change_scene(scene_name: String):
 				scene_container.add_child(current_scene)
 				print("UI scene instantiated and added to scene container")
 			elif is_game_scene:
-				# Game scenes replace the entire scene tree
-				get_tree().current_scene.add_child(current_scene)
-				print("Game scene instantiated and added to scene tree")
+				# Game scenes need to replace the UI completely
+				scene_container.visible = false
+				
+				# Add the game scene as a sibling to SceneContainer, but after it
+				# This ensures the game scene renders on top
+				get_parent().add_child(current_scene)
+				get_parent().move_child(current_scene, get_index() + 1)
+				
+				print("Game scene instantiated and added as sibling to SceneController")
+				print("Game scene visible: ", current_scene.visible)
+				print("Game scene position in tree: ", current_scene.get_index())
+				print("Parent children count: ", get_parent().get_child_count())
 			
 			# Connect buttons based on scene type
 			_connect_scene_buttons(scene_name)
 			
+			current_scene_name = scene_name
 			scene_changed.emit(scene_name)
 			print("Changed to scene: ", scene_name)
 		else:
