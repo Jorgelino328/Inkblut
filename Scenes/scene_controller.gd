@@ -9,7 +9,9 @@ var current_scene_name: String = ""
 
 # UI scenes that go in the scene_container (Control)
 const UI_SCENES = {
+	"login": "res://Scenes/UI/login.tscn",
 	"main_menu": "res://Scenes/UI/main_menu.tscn",
+	"global_lobby": "res://Scenes/UI/global_lobby.tscn",
 	"mode_select": "res://Scenes/UI/mode_select.tscn", 
 	"find_game": "res://Scenes/UI/find_game.tscn",
 	"custom_match": "res://Scenes/UI/custom_match.tscn",
@@ -38,8 +40,12 @@ func _ready():
 	# Add to group so other scripts can find this controller
 	add_to_group("scene_controller")
 	
-	# Start with main menu
-	change_scene("main_menu")
+	# Check if user is logged in, if not start with login
+	var user_manager = get_node_or_null("/root/UserManager")
+	if user_manager and user_manager.is_logged_in():
+		change_scene("main_menu")
+	else:
+		change_scene("login")
 
 func change_scene(scene_name: String):
 	print("=== SCENE CONTROLLER: CHANGE_SCENE CALLED ===")
@@ -242,7 +248,7 @@ func _on_respawn_pressed():
 	change_scene("test_scene")
 
 func _on_quit_to_main_menu_pressed():
-	change_scene("main_menu")
+	change_scene("global_lobby")
 
 func _on_create_lobby_pressed():
 	# Get the selected options from the custom match scene

@@ -1,0 +1,203 @@
+[gd_scene load_steps=3 format=3 uid="uid://cuvd4ed40stp7"]
+
+[ext_resource type="Theme" uid="uid://dyswh45trxwxj" path="res://Assets/Themes/inkblut_classic.tres" id="1_theme"]
+[ext_resource type="Script" path="res://Scenes/UI/login.gd" id="2_script"]
+
+[node name="Login" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_theme")
+script = ExtResource("2_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.1, 0.15, 1)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LoginPanel" type="Panel" parent="CenterContainer"]
+custom_minimum_size = Vector2(450, 500)
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/LoginPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/LoginPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "INKBLUT"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="CenterContainer/LoginPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="TabContainer" type="TabContainer" parent="CenterContainer/LoginPanel/VBoxContainer"]
+clip_contents = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Login" type="VBoxContainer" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer"]
+layout_mode = 2
+
+[node name="Spacer1" type="Control" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Login"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="UsernameLabel" type="Label" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Login"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "Username/Email:"
+
+[node name="UsernameInput" type="LineEdit" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Login"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+placeholder_text = "Enter username or email"
+
+[node name="Spacer2" type="Control" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Login"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="PasswordLabel" type="Label" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Login"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+text = "Password:"
+
+[node name="PasswordInput" type="LineEdit" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Login"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+placeholder_text = "Enter password"
+secret = true
+
+[node name="Spacer3" type="Control" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Login"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Register" type="VBoxContainer" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer"]
+visible = false
+layout_mode = 2
+
+[node name="Spacer4" type="Control" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="RegUsernameLabel" type="Label" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Username:"
+
+[node name="RegUsernameInput" type="LineEdit" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+layout_mode = 2
+placeholder_text = "Choose a username"
+
+[node name="Spacer5" type="Control" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="RegEmailLabel" type="Label" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Email:"
+
+[node name="RegEmailInput" type="LineEdit" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+layout_mode = 2
+placeholder_text = "Enter your email"
+
+[node name="Spacer6" type="Control" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="RegPasswordLabel" type="Label" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Password:"
+
+[node name="RegPasswordInput" type="LineEdit" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+layout_mode = 2
+placeholder_text = "Choose a password"
+secret = true
+
+[node name="Spacer7" type="Control" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="RegPasswordConfirmLabel" type="Label" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Confirm Password:"
+
+[node name="RegPasswordConfirmInput" type="LineEdit" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+layout_mode = 2
+placeholder_text = "Confirm your password"
+secret = true
+
+[node name="Spacer8" type="Control" parent="CenterContainer/LoginPanel/VBoxContainer/TabContainer/Register"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Spacer9" type="Control" parent="CenterContainer/LoginPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="ActionButton" type="Button" parent="CenterContainer/LoginPanel/VBoxContainer"]
+layout_mode = 2
+text = "Login"
+
+[node name="VersionLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -30.0
+offset_right = 200.0
+offset_bottom = -10.0
+grow_vertical = 0
+text = "Inkblut v1.0"
+vertical_alignment = 2
+
+[node name="MessageDialog" type="AcceptDialog" parent="."]
+title = "ERROR"
+initial_position = 1
+size = Vector2i(400, 150)
+theme = ExtResource("1_theme")
+
+[node name="MessageLabel" type="Label" parent="MessageDialog"]
+offset_left = 20.0
+offset_top = 5.0
+offset_right = 395.0
+offset_bottom = 98.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_y = 0
+theme_override_constants/outline_size = 1
+theme_override_constants/shadow_outline_size = 0
+theme_override_font_sizes/font_size = 22
+text = "Message text here"
+vertical_alignment = 1
+autowrap_mode = 3

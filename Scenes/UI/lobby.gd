@@ -169,10 +169,10 @@ func _on_leave_lobby_pressed():
 	if network_manager:
 		network_manager.disconnect_from_server()
 	
-	# Go back to mode select
+	# Go back to global lobby
 	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
 	if scene_controller:
-		scene_controller.change_scene("mode_select")
+		scene_controller.change_scene("global_lobby")
 
 
 

@@ -1,0 +1,261 @@
+[gd_scene load_steps=3 format=3 uid="uid://dgkx4ed40stp8"]
+
+[ext_resource type="Theme" uid="uid://dyswh45trxwxj" path="res://Assets/Themes/inkblut_classic.tres" id="1_theme"]
+[ext_resource type="Script" path="res://Scenes/UI/global_lobby.gd" id="2_script"]
+
+[node name="GlobalLobby" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_theme")
+script = ExtResource("2_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.1, 0.15, 1)
+
+[node name="HSplitContainer" type="HSplitContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+split_offset = 800
+
+[node name="MatchListPanel" type="Panel" parent="HSplitContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HSplitContainer/MatchListPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HeaderContainer" type="HBoxContainer" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "INKBLUT - GLOBAL LOBBY"
+vertical_alignment = 1
+
+[node name="LogoutButton" type="Button" parent="HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer"]
+layout_mode = 2
+text = "Logout"
+
+[node name="HSeparator" type="HSeparator" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="FilterContainer" type="HBoxContainer" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="FilterLabel" type="Label" parent="HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer"]
+layout_mode = 2
+text = "Filters:"
+vertical_alignment = 1
+
+[node name="GameModeFilter" type="OptionButton" parent="HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 0
+item_count = 3
+popup/item_0/text = "All Modes"
+popup/item_0/id = 0
+popup/item_1/text = "Free-for-All"
+popup/item_1/id = 1
+popup/item_2/text = "Team Deathmatch"
+popup/item_2/id = 2
+
+[node name="StatusFilter" type="OptionButton" parent="HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 0
+item_count = 4
+popup/item_0/text = "All Matches"
+popup/item_0/id = 0
+popup/item_1/text = "Waiting"
+popup/item_1/id = 1
+popup/item_2/text = "In Progress"
+popup/item_2/id = 2
+popup/item_3/text = "Finished"
+popup/item_3/id = 3
+
+[node name="RefreshButton" type="Button" parent="HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer"]
+layout_mode = 2
+text = "Refresh"
+
+[node name="MatchListContainer" type="ScrollContainer" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MatchList" type="VBoxContainer" parent="HSplitContainer/MatchListPanel/VBoxContainer/MatchListContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CreateMatchButton" type="Button" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
+layout_mode = 2
+text = "Create New Match"
+
+[node name="ChatPanel" type="Panel" parent="HSplitContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="HSplitContainer/ChatPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ChatTitleContainer" type="HBoxContainer" parent="HSplitContainer/ChatPanel/VBoxContainer2"]
+layout_mode = 2
+
+[node name="ChatTitleLabel" type="Label" parent="HSplitContainer/ChatPanel/VBoxContainer2/ChatTitleContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Global Chat"
+vertical_alignment = 1
+
+[node name="OnlineCountLabel" type="Label" parent="HSplitContainer/ChatPanel/VBoxContainer2/ChatTitleContainer"]
+layout_mode = 2
+text = "0 users online"
+vertical_alignment = 1
+
+[node name="HSeparator2" type="HSeparator" parent="HSplitContainer/ChatPanel/VBoxContainer2"]
+layout_mode = 2
+
+[node name="ChatContainer" type="ScrollContainer" parent="HSplitContainer/ChatPanel/VBoxContainer2"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ChatHistory" type="RichTextLabel" parent="HSplitContainer/ChatPanel/VBoxContainer2/ChatContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "Welcome to Inkblut! Chat with other players here."
+scroll_following = true
+
+[node name="MessageContainer" type="HBoxContainer" parent="HSplitContainer/ChatPanel/VBoxContainer2"]
+layout_mode = 2
+
+[node name="MessageInput" type="LineEdit" parent="HSplitContainer/ChatPanel/VBoxContainer2/MessageContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Type your message here..."
+
+[node name="SendButton" type="Button" parent="HSplitContainer/ChatPanel/VBoxContainer2/MessageContainer"]
+layout_mode = 2
+text = "Send"
+
+[node name="CreateMatchDialog" type="AcceptDialog" parent="."]
+title = "Create New Match"
+initial_position = 1
+size = Vector2i(400, 350)
+
+[node name="VBoxContainer3" type="VBoxContainer" parent="CreateMatchDialog"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 392.0
+offset_bottom = 311.0
+
+[node name="MatchNameLabel" type="Label" parent="CreateMatchDialog/VBoxContainer3"]
+layout_mode = 2
+text = "Match Name:"
+
+[node name="MatchNameInput" type="LineEdit" parent="CreateMatchDialog/VBoxContainer3"]
+layout_mode = 2
+text = "My Match"
+
+[node name="Spacer1" type="Control" parent="CreateMatchDialog/VBoxContainer3"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="GameModeLabel" type="Label" parent="CreateMatchDialog/VBoxContainer3"]
+layout_mode = 2
+text = "Game Mode:"
+
+[node name="GameModeSelect" type="OptionButton" parent="CreateMatchDialog/VBoxContainer3"]
+layout_mode = 2
+selected = 0
+item_count = 2
+popup/item_0/text = "Free-for-All"
+popup/item_0/id = 0
+popup/item_1/text = "Team Deathmatch"
+popup/item_1/id = 1
+
+[node name="Spacer2" type="Control" parent="CreateMatchDialog/VBoxContainer3"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="MapLabel" type="Label" parent="CreateMatchDialog/VBoxContainer3"]
+layout_mode = 2
+text = "Map:"
+
+[node name="MapSelect" type="OptionButton" parent="CreateMatchDialog/VBoxContainer3"]
+layout_mode = 2
+selected = 0
+item_count = 3
+popup/item_0/text = "Map 1"
+popup/item_0/id = 0
+popup/item_1/text = "Map 2"
+popup/item_1/id = 1
+popup/item_2/text = "Map 3"
+popup/item_2/id = 2
+
+[node name="Spacer3" type="Control" parent="CreateMatchDialog/VBoxContainer3"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="MaxPlayersLabel" type="Label" parent="CreateMatchDialog/VBoxContainer3"]
+layout_mode = 2
+text = "Max Players:"
+
+[node name="MaxPlayersInput" type="SpinBox" parent="CreateMatchDialog/VBoxContainer3"]
+layout_mode = 2
+min_value = 2.0
+max_value = 8.0
+value = 4.0
+
+[node name="Spacer4" type="Control" parent="CreateMatchDialog/VBoxContainer3"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="ButtonContainer" type="HBoxContainer" parent="CreateMatchDialog/VBoxContainer3"]
+layout_mode = 2
+
+[node name="CancelButton" type="Button" parent="CreateMatchDialog/VBoxContainer3/ButtonContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Cancel"
+
+[node name="CreateButton" type="Button" parent="CreateMatchDialog/VBoxContainer3/ButtonContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Create Match"
