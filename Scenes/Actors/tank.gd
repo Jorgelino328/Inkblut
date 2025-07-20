@@ -10,15 +10,42 @@ var shot = preload("res://Scenes/Projectiles/inkshot.tscn")
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 var player_id: int = 1
 
+# Network synchronized variables
+var network_position: Vector2
+var network_velocity: Vector2
+var network_cannon_rotation: float
+var network_body_flip: bool
+var network_animation: String = "Idle"
+
 func _ready():
 	# Set the player ID based on multiplayer authority
 	player_id = get_multiplayer_authority()
+	
+	# Initialize network variables
+	network_position = global_position
+	network_velocity = velocity
+	network_cannon_rotation = $Body/Cannon.rotation
+	network_body_flip = $Body.flip_h
 
 func _physics_process(delta):
-	# Only process input for the local player
-	if not is_multiplayer_authority():
-		return
-	
+	if is_multiplayer_authority():
+		# Local player - process input and movement
+		_handle_local_input(delta)
+		
+		# Update network variables for synchronization
+		network_position = global_position
+		network_velocity = velocity
+		network_cannon_rotation = $Body/Cannon.rotation
+		network_body_flip = $Body.flip_h
+		network_animation = anim.current_animation if anim.current_animation else "Idle"
+		
+		# Send movement data to other clients
+		_sync_movement.rpc(network_position, network_velocity, network_cannon_rotation, network_body_flip, network_animation)
+	else:
+		# Remote player - interpolate to network position
+		_handle_remote_movement(delta)
+
+func _handle_local_input(delta):
 	# Point cannon at mouse
 	$Body/Cannon.look_at(get_viewport().get_mouse_position())
 	
@@ -51,6 +78,30 @@ func _physics_process(delta):
 		anim.play("Idle")
 		
 	move_and_slide()
+
+func _handle_remote_movement(delta):
+	# Smoothly interpolate to the network position
+	global_position = global_position.lerp(network_position, delta * 10.0)
+	velocity = velocity.lerp(network_velocity, delta * 10.0)
+	
+	# Update cannon rotation
+	$Body/Cannon.rotation = lerp_angle($Body/Cannon.rotation, network_cannon_rotation, delta * 15.0)
+	
+	# Update body flip
+	$Body.flip_h = network_body_flip
+	
+	# Update animation
+	if anim.current_animation != network_animation and network_animation != "":
+		anim.play(network_animation)
+
+# RPC function to synchronize movement data
+@rpc("any_peer", "unreliable", "call_remote")
+func _sync_movement(pos: Vector2, vel: Vector2, cannon_rot: float, body_flip: bool, animation: String):
+	network_position = pos
+	network_velocity = vel
+	network_cannon_rotation = cannon_rot
+	network_body_flip = body_flip
+	network_animation = animation
 	
 # Play jump animation and add jump velocity
 func jump():
