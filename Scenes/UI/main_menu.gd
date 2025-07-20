@@ -57,7 +57,7 @@ func _on_play_pressed():
 	if current_user:
 		user_manager.set_user_status(current_user.username, "lobby")
 	
-	scene_controller.change_scene("global_lobby")
+	scene_controller.change_scene("mode_select")
 
 func _on_settings_pressed():
 	# TODO: Implement settings menu

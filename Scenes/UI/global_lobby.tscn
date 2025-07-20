@@ -54,18 +54,35 @@ grow_vertical = 2
 [node name="HeaderContainer" type="HBoxContainer" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
 layout_mode = 2
 
+[node name="BackButton" type="Button" parent="HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer"]
+layout_mode = 2
+text = "← Back  "
+
 [node name="TitleLabel" type="Label" parent="HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "INKBLUT - GLOBAL LOBBY"
+text = "  INKBLUT - GLOBAL LOBBY"
 vertical_alignment = 1
 
 [node name="LogoutButton" type="Button" parent="HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer"]
 layout_mode = 2
-text = "Logout"
+text = " Logout "
 
 [node name="HSeparator" type="HSeparator" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
 layout_mode = 2
+
+[node name="SearchContainer" type="HBoxContainer" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="SearchLabel" type="Label" parent="HSplitContainer/MatchListPanel/VBoxContainer/SearchContainer"]
+layout_mode = 2
+text = "Search:"
+vertical_alignment = 1
+
+[node name="SearchField" type="LineEdit" parent="HSplitContainer/MatchListPanel/VBoxContainer/SearchContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Search servers by name..."
 
 [node name="FilterContainer" type="HBoxContainer" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
 layout_mode = 2
@@ -78,32 +95,28 @@ vertical_alignment = 1
 [node name="GameModeFilter" type="OptionButton" parent="HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
-selected = 0
 item_count = 3
-popup/item_0/text = "All Modes"
+selected = 0
+popup/item_0/text = " All Modes"
 popup/item_0/id = 0
-popup/item_1/text = "Free-for-All"
+popup/item_1/text = " Free-for-All"
 popup/item_1/id = 1
-popup/item_2/text = "Team Deathmatch"
+popup/item_2/text = " Team Deathmatch"
 popup/item_2/id = 2
 
 [node name="StatusFilter" type="OptionButton" parent="HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+item_count = 2
 selected = 0
-item_count = 4
-popup/item_0/text = "All Matches"
+popup/item_0/text = " All Servers"
 popup/item_0/id = 0
-popup/item_1/text = "Waiting"
+popup/item_1/text = " Joinable Only"
 popup/item_1/id = 1
-popup/item_2/text = "In Progress"
-popup/item_2/id = 2
-popup/item_3/text = "Finished"
-popup/item_3/id = 3
 
 [node name="RefreshButton" type="Button" parent="HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer"]
 layout_mode = 2
-text = "Refresh"
+text = " Refresh "
 
 [node name="MatchListContainer" type="ScrollContainer" parent="HSplitContainer/MatchListPanel/VBoxContainer"]
 layout_mode = 2
@@ -118,6 +131,7 @@ layout_mode = 2
 text = "Create New Match"
 
 [node name="ChatPanel" type="Panel" parent="HSplitContainer"]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 
@@ -139,11 +153,13 @@ layout_mode = 2
 [node name="ChatTitleLabel" type="Label" parent="HSplitContainer/ChatPanel/VBoxContainer2/ChatTitleContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
 text = "Global Chat"
 vertical_alignment = 1
 
 [node name="OnlineCountLabel" type="Label" parent="HSplitContainer/ChatPanel/VBoxContainer2/ChatTitleContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 18
 text = "0 users online"
 vertical_alignment = 1
 
@@ -172,7 +188,7 @@ placeholder_text = "Type your message here..."
 
 [node name="SendButton" type="Button" parent="HSplitContainer/ChatPanel/VBoxContainer2/MessageContainer"]
 layout_mode = 2
-text = "Send"
+text = " Send "
 
 [node name="CreateMatchDialog" type="AcceptDialog" parent="."]
 title = "Create New Match"
@@ -203,7 +219,6 @@ text = "Game Mode:"
 
 [node name="GameModeSelect" type="OptionButton" parent="CreateMatchDialog/VBoxContainer3"]
 layout_mode = 2
-selected = 0
 item_count = 2
 popup/item_0/text = "Free-for-All"
 popup/item_0/id = 0
@@ -220,7 +235,6 @@ text = "Map:"
 
 [node name="MapSelect" type="OptionButton" parent="CreateMatchDialog/VBoxContainer3"]
 layout_mode = 2
-selected = 0
 item_count = 3
 popup/item_0/text = "Map 1"
 popup/item_0/id = 0

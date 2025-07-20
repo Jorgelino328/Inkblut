@@ -104,11 +104,23 @@ func get_chat_history() -> Array:
 
 func create_match(creator_username: String, match_name: String, game_mode: String, map: String, max_players: int) -> Dictionary:
 	"""Create a new match in the lobby"""
+	print("=== LOBBY MANAGER: CREATE_MATCH ===")
+	print("Creator: ", creator_username)
+	print("Match name: ", match_name)
+	print("Game mode: ", game_mode)
+	print("Map: ", map)
+	print("Max players: ", max_players)
+	
 	if not lobby_users.has(creator_username):
+		print("ERROR: User not in lobby: ", creator_username)
+		print("Current lobby users: ", lobby_users.keys())
 		return {"success": false, "message": "User not in lobby"}
 	
 	var new_match = LobbyMatch.new(creator_username, match_name, game_mode, map, max_players)
 	lobby_matches[new_match.id] = new_match
+	
+	print("Match created with ID: ", new_match.id)
+	print("Total matches now: ", lobby_matches.size())
 	
 	# Update user status
 	lobby_users[creator_username].status = "in_match"
@@ -216,6 +228,12 @@ func end_match(match_id: String):
 
 func get_available_matches() -> Array[Dictionary]:
 	"""Get list of matches that can be joined"""
+	print("=== LOBBY MANAGER: GET_AVAILABLE_MATCHES ===")
+	print("Total lobby matches: ", lobby_matches.size())
+	for match_id in lobby_matches.keys():
+		var lobby_match = lobby_matches[match_id]
+		print("  - Match ID: ", match_id, " | Name: ", lobby_match.name, " | Status: ", lobby_match.status)
+	
 	var available_matches: Array[Dictionary] = []
 	for lobby_match in lobby_matches.values():
 		if lobby_match.status == "created":
@@ -229,6 +247,8 @@ func get_available_matches() -> Array[Dictionary]:
 				"current_players": lobby_match.current_players.size(),
 				"player_list": lobby_match.current_players
 			})
+	
+	print("Available matches to return: ", available_matches.size())
 	return available_matches
 
 func get_match_info(match_id: String) -> Dictionary:

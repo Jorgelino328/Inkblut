@@ -12,8 +12,7 @@ const UI_SCENES = {
 	"login": "res://Scenes/UI/login.tscn",
 	"main_menu": "res://Scenes/UI/main_menu.tscn",
 	"global_lobby": "res://Scenes/UI/global_lobby.tscn",
-	"mode_select": "res://Scenes/UI/mode_select.tscn", 
-	"find_game": "res://Scenes/UI/find_game.tscn",
+	"mode_select": "res://Scenes/UI/mode_select.tscn",
 	"custom_match": "res://Scenes/UI/custom_match.tscn",
 	"lobby": "res://Scenes/UI/lobby.tscn",
 	"game_over": "res://Scenes/UI/game_over.tscn"
@@ -27,16 +26,7 @@ const GAME_SCENES = {
 	"map_3": "res://Scenes/Levels/map_3.tscn"
 }
 
-# Combined dictionary for backward compatibility (not const so we can modify it)
-var SCENES = {}
-
 func _ready():
-	# Combine the scene dictionaries for backward compatibility
-	for scene_name in UI_SCENES:
-		SCENES[scene_name] = UI_SCENES[scene_name]
-	for scene_name in GAME_SCENES:
-		SCENES[scene_name] = GAME_SCENES[scene_name]
-	
 	# Add to group so other scripts can find this controller
 	add_to_group("scene_controller")
 	
@@ -87,7 +77,13 @@ func change_scene(scene_name: String):
 		print("Scene not found: ", scene_name)
 		return
 	
-	var scene_path = SCENES[scene_name]
+	# Get the scene path from the appropriate dictionary
+	var scene_path = ""
+	if is_ui_scene:
+		scene_path = UI_SCENES[scene_name]
+	else:
+		scene_path = GAME_SCENES[scene_name]
+		
 	print("Loading scene from path: ", scene_path)
 	
 	var scene_resource = null
@@ -149,10 +145,10 @@ func _connect_scene_buttons(scene_name: String):
 	match scene_name:
 		"main_menu":
 			_connect_main_menu_buttons()
+		"global_lobby":
+			_connect_global_lobby_buttons()
 		"mode_select":
 			_connect_mode_select_buttons()
-		"find_game":
-			_connect_find_game_buttons()
 		"custom_match":
 			_connect_custom_match_buttons()
 		"lobby":
@@ -176,24 +172,13 @@ func _connect_main_menu_buttons():
 		settings_button.pressed.connect(_on_settings_pressed)
 	if quit_button:
 		quit_button.pressed.connect(_on_quit_pressed)
+	
+func _connect_global_lobby_buttons():
+	# The global_lobby scene now handles its own button connections
+	pass
 
 func _connect_mode_select_buttons():
-	var quick_game_button = current_scene.get_node_or_null("ModeContainer/QuickGameButton")
-	var find_game_button = current_scene.get_node_or_null("ModeContainer/FindGameButton")
-	var host_game_button = current_scene.get_node_or_null("ModeContainer/HostGameButton")
-	var back_button = current_scene.get_node_or_null("ModeContainer/BackButton")
-	
-	if quick_game_button:
-		quick_game_button.pressed.connect(_on_quick_game_pressed)
-	if find_game_button:
-		find_game_button.pressed.connect(_on_find_game_pressed)
-	if host_game_button:
-		host_game_button.pressed.connect(_on_host_game_pressed)
-	if back_button:
-		back_button.pressed.connect(_on_back_to_main_menu_pressed)
-
-func _connect_find_game_buttons():
-	# The find_game scene now handles its own button connections
+	# Mode select scene handles its own button connections now
 	pass
 
 func _connect_custom_match_buttons():
@@ -232,14 +217,17 @@ func _on_quick_game_pressed():
 	print("Quick play initiated...")
 	network_manager.quick_play()
 
-func _on_find_game_pressed():
-	change_scene("find_game")
+func _on_global_lobby_pressed():
+	change_scene("global_lobby")
 
 func _on_host_game_pressed():
 	change_scene("custom_match")
 
 func _on_back_to_main_menu_pressed():
 	change_scene("main_menu")
+
+func _on_back_to_global_lobby_pressed():
+	change_scene("global_lobby")
 
 func _on_back_to_mode_select_pressed():
 	change_scene("mode_select")

@@ -1,9 +1,11 @@
-[gd_scene load_steps=3 format=3 uid="uid://b25qqa3jnjqr4"]
+[gd_scene load_steps=4 format=3 uid="uid://b25qqa3jnjqr4"]
 
 [ext_resource type="Texture2D" uid="uid://b4bqicyso63m2" path="res://Assets/Sprites/menu.png" id="1_07k5m"]
 [ext_resource type="Theme" uid="uid://dyswh45trxwxj" path="res://Assets/Themes/inkblut_classic.tres" id="2_1kbqs"]
+[ext_resource type="Script" path="res://Scenes/UI/mode_select.gd" id="3_mode_select_script"]
 
 [node name="ModeSelect" type="Control"]
+script = ExtResource("3_mode_select_script")
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

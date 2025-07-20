@@ -7,7 +7,9 @@ extends Control
 @onready var send_button: Button = $HSplitContainer/ChatPanel/VBoxContainer2/MessageContainer/SendButton
 @onready var online_count_label: Label = $HSplitContainer/ChatPanel/VBoxContainer2/ChatTitleContainer/OnlineCountLabel
 @onready var logout_button: Button = $HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer/LogoutButton
+@onready var back_button: Button = $HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer/BackButton
 @onready var refresh_button: Button = $HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer/RefreshButton
+@onready var search_field: LineEdit = $HSplitContainer/MatchListPanel/VBoxContainer/SearchContainer/SearchField
 @onready var create_match_button: Button = $HSplitContainer/MatchListPanel/VBoxContainer/CreateMatchButton
 @onready var game_mode_filter: OptionButton = $HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer/GameModeFilter
 @onready var status_filter: OptionButton = $HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer/StatusFilter
@@ -28,6 +30,7 @@ var network_manager: NetworkManager
 
 # Local state
 var current_matches: Array[Dictionary] = []
+var all_servers: Array[Dictionary] = []
 var current_user: UserManager.UserData = null
 
 func _ready():
@@ -65,6 +68,14 @@ func _ready():
 	# Join the global lobby
 	lobby_manager.join_lobby(current_user.username)
 	
+	# Start server discovery to find available servers
+	if network_manager:
+		print("Starting server discovery...")
+		network_manager.start_server_discovery()
+		# Connect to server list updates
+		if not network_manager.server_list_updated.is_connected(_on_server_list_updated):
+			network_manager.server_list_updated.connect(_on_server_list_updated)
+	
 	# Initial updates
 	_update_matches()
 	_update_chat()
@@ -72,6 +83,7 @@ func _ready():
 
 func _connect_signals():
 	# UI signals
+	back_button.pressed.connect(_on_back_pressed)
 	logout_button.pressed.connect(_on_logout_pressed)
 	refresh_button.pressed.connect(_on_refresh_pressed)
 	create_match_button.pressed.connect(_on_create_match_pressed)
@@ -79,6 +91,10 @@ func _connect_signals():
 	message_input.text_submitted.connect(_on_message_submitted)
 	game_mode_filter.item_selected.connect(_on_filter_changed)
 	status_filter.item_selected.connect(_on_filter_changed)
+	
+	# Search functionality
+	if search_field:
+		search_field.text_changed.connect(_on_search_text_changed)
 	
 	# Create match dialog signals
 	cancel_button.pressed.connect(_on_cancel_create_match)
@@ -93,85 +109,156 @@ func _connect_signals():
 	lobby_manager.match_ended.connect(_on_match_ended)
 
 func _update_matches():
-	print("Updating matches display")
+	print("=== Updating matches display ===")
+	
+	# Get available servers from NetworkManager (the working system)
+	if network_manager:
+		all_servers = network_manager.get_available_servers()
+		print("Available servers from NetworkManager: ", all_servers.size())
+		for server in all_servers:
+			print("  - Server: ", server.get("name", "Unknown"), " | IP: ", server.get("ip", "Unknown"), ":", server.get("port", 0))
+	else:
+		print("NetworkManager not found - no servers available")
+		all_servers = []
+	
+	# Apply filters to show relevant servers
+	_apply_filters()
+
+func _apply_filters():
+	"""Apply search and filter criteria to show relevant servers"""
+	print("=== Applying filters ===")
 	
 	# Clear existing match buttons
 	for child in match_list.get_children():
 		child.queue_free()
 	
-	# Get matches from lobby manager
-	var matches = lobby_manager.get_available_matches()
-	current_matches = matches
+	# Get filter values
+	var search_text = search_field.text.to_lower() if search_field else ""
+	var game_mode_selected = game_mode_filter.selected if game_mode_filter else 0
+	var status_selected = status_filter.selected if status_filter else 0
 	
-	# Apply filters
-	var filtered_matches = _apply_match_filters(matches)
+	print("Search text: '", search_text, "'")
+	print("Game mode filter: ", game_mode_selected)
+	print("Status filter: ", status_selected)
 	
-	if filtered_matches.is_empty():
-		var no_matches_label = Label.new()
-		no_matches_label.text = "No matches found"
-		no_matches_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		match_list.add_child(no_matches_label)
-		return
+	# Filter servers
+	var filtered_servers = all_servers.filter(func(server): 
+		return _server_matches_filters(server, search_text, game_mode_selected, status_selected)
+	)
 	
-	# Create match buttons
-	for game_match in filtered_matches:
-		_create_match_button(game_match)
+	print("Filtered servers: ", filtered_servers.size(), " out of ", all_servers.size())
+	
+	# Create server buttons for filtered servers
+	for server in filtered_servers:
+		_create_server_button(server)
+	
+	# Handle "no servers" message
+	if filtered_servers.is_empty():
+		var no_servers_label = Label.new()
+		if search_text != "":
+			no_servers_label.text = "No servers found matching your search"
+		else:
+			no_servers_label.text = "No servers found"
+		no_servers_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		match_list.add_child(no_servers_label)
+		print("No servers to display")
 
-func _apply_match_filters(matches: Array[Dictionary]) -> Array[Dictionary]:
-	var filtered = matches.duplicate()
+func _server_matches_filters(server_info: Dictionary, search_text: String, game_mode_selected: int, status_selected: int) -> bool:
+	"""Check if a server matches the current filter criteria"""
+	
+	# Search text filter (matches server name)
+	if search_text != "":
+		var server_name = server_info.get("name", "").to_lower()
+		if not server_name.contains(search_text):
+			return false
 	
 	# Game mode filter
-	var mode_filter = game_mode_filter.selected
-	if mode_filter > 0:
-		var mode_text = game_mode_filter.get_item_text(mode_filter)
-		filtered = filtered.filter(func(m): return m.get("game_mode", "") == mode_text)
+	if game_mode_selected > 0 and game_mode_filter:
+		var selected_mode = game_mode_filter.get_item_text(game_mode_selected)
+		var server_mode = server_info.get("game_mode", "")
+		if server_mode != selected_mode:
+			return false
 	
-	# Status filter
-	var status_filter_val = status_filter.selected
-	if status_filter_val > 0:
-		var status_text = status_filter.get_item_text(status_filter_val).to_lower()
-		filtered = filtered.filter(func(m): return m.get("status", "").to_lower() == status_text)
+	# Status filter (joinable vs all)
+	if status_selected > 0:
+		var current_players = server_info.get("current_players", 0)
+		var max_players = server_info.get("max_players", 0)
+		if status_selected == 1 and current_players >= max_players:  # "Joinable only"
+			return false
 	
-	return filtered
+	return true
 
-func _create_match_button(game_match: Dictionary):
-	var container = HBoxContainer.new()
+func _create_server_button(server_info: Dictionary):
+	"""Create a clickable button for a server, similar to find_game.gd"""
+	# Create main server button
+	var button = Button.new()
 	
-	# Match info label
-	var info_label = Label.new()
-	var status = game_match.get("status", "waiting")
-	var players = game_match.get("current_players", 0)
-	var max_players = game_match.get("max_players", 4)
-	var game_mode = game_match.get("game_mode", "Free-for-All")
-	var map_name = game_match.get("map", "Map 1")
-	
-	info_label.text = "%s - %s - %s (%d/%d) - %s" % [
-		game_match.get("name", "Unknown Match"),
-		game_mode,
-		map_name,
-		players,
-		max_players,
-		status.capitalize()
+	# Format button text like find_game.gd
+	var button_text = "%s - %s - %s - %d/%d" % [
+		server_info.get("name", "Unknown Server"),
+		server_info.get("game_mode", "Unknown Mode"),
+		server_info.get("map", "Unknown Map"),
+		server_info.get("current_players", 0),
+		server_info.get("max_players", 4)
 	]
-	info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	
-	container.add_child(info_label)
+	button.text = button_text
+	button.pressed.connect(_on_server_selected.bind(server_info))
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	
-	# Join button (only if match is waiting and has space)
-	if status == "waiting" and players < max_players:
-		var join_button = Button.new()
-		join_button.text = "Join"
-		join_button.pressed.connect(_on_join_match.bind(game_match))
-		container.add_child(join_button)
+	# Add button to server list
+	match_list.add_child(button)
+	print("Created server button: ", button_text)
+
+func _on_server_selected(server_info: Dictionary):
+	"""Handle server selection - connect to the chosen server"""
+	print("=== JOINING SERVER ===")
+	print("Server name: ", server_info.get("name"))
+	print("Server port: ", server_info.get("port"))
+	print("Server info: ", server_info)
 	
-	match_list.add_child(container)
+	if network_manager:
+		# Connect to network manager signals for connection
+		if not network_manager.connected_to_server.is_connected(_on_connected_to_server):
+			network_manager.connected_to_server.connect(_on_connected_to_server)
+		
+		print("Initiating connection to server at 127.0.0.1:", server_info.get("port", 7000))
+		# Connect to the server
+		var success = network_manager.connect_to_server("127.0.0.1", server_info.get("port", 7000))
+		if success:
+			print("Connection initiation successful, waiting for result...")
+		else:
+			print("Failed to initiate connection to server")
+			show_message("Failed to connect to server")
+	else:
+		print("ERROR: No network manager available")
+		show_message("Network manager not available")
+
+func _on_connected_to_server(success: bool):
+	"""Handle connection result"""
+	print("Connection attempt result: ", success)
+	if success:
+		print("Successfully joined server!")
+		show_message("Successfully joined server!")
+		# NetworkManager will automatically handle scene transition to lobby
+	else:
+		print("Failed to join server - connection unsuccessful")
+		show_message("Failed to join server")
+
+func _on_search_text_changed(new_text: String):
+	"""Apply filters when search text changes"""
+	_apply_filters()
+
+func _on_filter_changed(index: int = 0):
+	"""Apply filters when any filter option changes"""
+	_apply_filters()
 
 func _update_chat():
 	var messages = lobby_manager.get_chat_history()
 	chat_history.clear()
 	
 	for message in messages:
-		var timestamp = Time.get_datetime_string_from_unix_time(message.get("timestamp", 0))
+		var timestamp = message.get("timestamp", "")
 		var username = message.get("username", "Unknown")
 		var text = message.get("message", "")
 		
@@ -195,19 +282,27 @@ func _on_logout_pressed():
 	_go_to_login()
 
 func _on_refresh_pressed():
+	print("=== REFRESH PRESSED - Starting server discovery ===")
+	if network_manager:
+		network_manager.start_server_discovery()
 	_update_matches()
 	_update_chat()
 	_update_online_count()
 
 func _on_create_match_pressed():
-	# Set default values
-	match_name_input.text = "%s's Match" % current_user.username
-	game_mode_select.selected = 0
-	map_select.selected = 0
-	max_players_input.value = 4
-	
-	# Show dialog
-	create_match_dialog.popup_centered()
+	print("=== CREATE MATCH BUTTON PRESSED ===")
+	print("Going to custom match creation...")
+	# Use the working custom match system instead of the broken lobby manager
+	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
+	if scene_controller:
+		scene_controller.change_scene("custom_match")
+
+func _on_back_pressed():
+	print("=== BACK BUTTON PRESSED ===")
+	print("Going back to main menu...")
+	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
+	if scene_controller:
+		scene_controller.change_scene("main_menu")
 
 func _on_cancel_create_match():
 	create_match_dialog.hide()
@@ -225,50 +320,15 @@ func _on_confirm_create_match():
 	print("Creating match: ", match_name, " - ", game_mode_text, " - ", map_text, " - ", max_players)
 	
 	# Create match through lobby manager
-	var success = lobby_manager.create_match(current_user.username, match_name, game_mode_text, map_text, max_players)
+	var result = lobby_manager.create_match(current_user.username, match_name, game_mode_text, map_text, max_players)
 	
 	create_match_dialog.hide()
 	
-	if success:
+	if result.get("success", false):
 		show_message("Match created successfully!")
 		_update_matches()
 	else:
-		show_message("Failed to create match")
-
-func _on_join_match(game_match: Dictionary):
-	var match_id = game_match.get("id", "")
-	print("Attempting to join match: ", match_id)
-	
-	if match_id.is_empty():
-		show_message("Invalid match ID")
-		return
-	
-	# Join match through lobby manager
-	var success = lobby_manager.join_match(current_user.username, match_id)
-	
-	if success:
-		show_message("Joined match successfully!")
-		
-		# Start hosting/connecting to the actual game server
-		if network_manager:
-			var match_creator = game_match.get("creator", "")
-			
-			# If we're the creator, host the server
-			if match_creator == current_user.username:
-				print("We are the creator, starting server...")
-				var server_name = game_match.get("name", "Match")
-				var game_mode = game_match.get("game_mode", "Free-for-All")
-				var map_name = game_match.get("map", "Map 1")
-				var max_players = game_match.get("max_players", 4)
-				
-				network_manager.create_server(server_name, game_mode, map_name, max_players)
-			else:
-				print("Joining as client...")
-				# In a real implementation, we'd need the server's IP/port
-				# For now, assume localhost
-				network_manager.connect_to_server("127.0.0.1", 7000)
-	else:
-		show_message("Failed to join match")
+		show_message("Failed to create match: " + result.get("message", "Unknown error"))
 
 func _on_send_message():
 	_send_chat_message()
@@ -286,9 +346,6 @@ func _send_chat_message():
 	message_input.text = ""
 	message_input.grab_focus()
 
-func _on_filter_changed(index: int):
-	_update_matches()
-
 # LobbyManager signal handlers
 func _on_user_joined_lobby(username: String):
 	print("User joined lobby: ", username)
@@ -299,7 +356,7 @@ func _on_user_left_lobby(username: String):
 	print("User left lobby: ", username)
 	_update_online_count()
 
-func _on_chat_message_received(username: String, message: String, timestamp: float):
+func _on_chat_message_received(username: String, message: String):
 	print("Chat message from ", username, ": ", message)
 	_update_chat()
 
@@ -328,3 +385,8 @@ func _input(event):
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_ENTER and message_input.has_focus():
 			_send_chat_message()
+
+func _on_server_list_updated(servers: Array):
+	"""Called when NetworkManager updates the server list"""
+	print("=== Server list updated! Found ", servers.size(), " servers ===")
+	_update_matches()
