@@ -93,49 +93,4 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "LEAVE LOBBY"
 
-[node name="DebugPanel" type="Panel" parent="."]
-layout_mode = 0
-offset_left = 16.0
-offset_top = 16.0
-offset_right = 384.0
-offset_bottom = 200.0
 
-[node name="DebugContainer" type="VBoxContainer" parent="DebugPanel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 8.0
-offset_top = 8.0
-offset_right = -8.0
-offset_bottom = -8.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="DebugTitle" type="Label" parent="DebugPanel/DebugContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "DEBUG INFO"
-
-[node name="ServerStatus" type="Label" parent="DebugPanel/DebugContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Server Status: Unknown"
-
-[node name="PortInfo" type="Label" parent="DebugPanel/DebugContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Port: Unknown"
-
-[node name="PlayerCount" type="Label" parent="DebugPanel/DebugContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 12
-text = "Players: 0/0"
-
-[node name="RefreshButton" type="Button" parent="DebugPanel/DebugContainer"]
-layout_mode = 2
-text = "Refresh Debug Info"
-
-[node name="TestDiscoveryButton" type="Button" parent="DebugPanel/DebugContainer"]
-layout_mode = 2
-text = "Test Server Discovery"

@@ -5,13 +5,6 @@ extends Control
 @onready var start_game_button: Button = $ButtonContainer/StartGameButton
 @onready var leave_lobby_button: Button = $ButtonContainer/LeaveLobbyButton
 
-# Debug UI elements
-@onready var server_status_label: Label = $DebugPanel/DebugContainer/ServerStatus
-@onready var port_info_label: Label = $DebugPanel/DebugContainer/PortInfo
-@onready var player_count_label: Label = $DebugPanel/DebugContainer/PlayerCount
-@onready var refresh_debug_button: Button = $DebugPanel/DebugContainer/RefreshButton
-@onready var test_discovery_button: Button = $DebugPanel/DebugContainer/TestDiscoveryButton
-
 var network_manager: NetworkManager
 var is_host: bool = false
 
@@ -30,8 +23,6 @@ func _ready():
 	# Connect UI signals
 	start_game_button.pressed.connect(_on_start_game_pressed)
 	leave_lobby_button.pressed.connect(_on_leave_lobby_pressed)
-	refresh_debug_button.pressed.connect(_on_refresh_debug_pressed)
-	test_discovery_button.pressed.connect(_on_test_discovery_pressed)
 	
 	# Update UI based on role
 	start_game_button.visible = is_host
@@ -39,7 +30,6 @@ func _ready():
 	# Update server info
 	_update_server_info()
 	_update_player_list()
-	_update_debug_info()
 
 func _update_server_info():
 	if network_manager:
@@ -72,34 +62,15 @@ func _update_player_list():
 		player_list.add_child(player_label)
 
 func _update_debug_info():
-	if network_manager:
-		var info = network_manager.get_server_info()
-		
-		if is_host:
-			server_status_label.text = "Server Status: HOSTING"
-			port_info_label.text = "Port: " + str(info.get("port", "Unknown"))
-			player_count_label.text = "Players: %d/%d" % [
-				info.get("current_players", 0),
-				info.get("max_players", 0)
-			]
-		else:
-			server_status_label.text = "Server Status: CLIENT"
-			port_info_label.text = "Connected to: " + str(info.get("port", "Unknown"))
-			player_count_label.text = "Players: " + str(multiplayer.get_peers().size() + 1)
-	else:
-		server_status_label.text = "Server Status: NO NETWORK MANAGER"
-		port_info_label.text = "Port: Unknown"
-		player_count_label.text = "Players: Unknown"
+	# Debug function removed - no longer needed for production
 
 func _on_player_joined(id: int, name: String):
 	print("Player joined lobby: ", name)
 	_update_player_list()
-	_update_debug_info()
 
 func _on_player_left(id: int):
 	print("Player left lobby: ", id)
 	_update_player_list()
-	_update_debug_info()
 
 func _on_start_game_pressed():
 	if is_host:
@@ -116,22 +87,7 @@ func _on_leave_lobby_pressed():
 	if scene_controller:
 		scene_controller.change_scene("mode_select")
 
-func _on_refresh_debug_pressed():
-	_update_debug_info()
-	print("=== DEBUG INFO ===")
-	if network_manager:
-		var info = network_manager.get_server_info()
-		print("Server Info: ", info)
-		print("Is Host: ", is_host)
-		print("Multiplayer Peers: ", multiplayer.get_peers())
-		print("Multiplayer ID: ", multiplayer.get_unique_id())
-	print("==================")
 
-func _on_test_discovery_pressed():
-	if network_manager:
-		network_manager.test_server_discovery()
-	else:
-		print("No network manager available")
 
 @rpc("call_local", "reliable")
 func _start_game():

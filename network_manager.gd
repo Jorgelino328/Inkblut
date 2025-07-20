@@ -44,9 +44,12 @@ func create_server(server_name: String, game_mode: String, map_name: String, max
 	var error = multiplayer_peer.create_server(port, max_players)
 	
 	if error != OK:
-		print("Failed to create server: ", error)
+		print("Failed to create server on port ", port, ": ", error)
 		server_created.emit(false)
 		return false
+	
+	# Verify the server is actually listening
+	await get_tree().process_frame
 	
 	multiplayer.multiplayer_peer = multiplayer_peer
 	is_server = true
@@ -62,7 +65,7 @@ func create_server(server_name: String, game_mode: String, map_name: String, max
 	}
 	
 	# Start UDP server for discovery
-	_start_discovery_server()
+	_start_discovery_server(port)
 	
 	print("=== SERVER CREATED ===")
 	print("Name: ", server_name)
@@ -73,6 +76,12 @@ func create_server(server_name: String, game_mode: String, map_name: String, max
 	return true
 
 func connect_to_server(ip: String, port: int = DEFAULT_PORT) -> bool:
+	# Clean up any existing connection first
+	if multiplayer_peer:
+		multiplayer_peer.close()
+		multiplayer_peer = null
+		multiplayer.multiplayer_peer = null
+	
 	multiplayer_peer = ENetMultiplayerPeer.new()
 	var error = multiplayer_peer.create_client(ip, port)
 	
@@ -90,11 +99,19 @@ func connect_to_server(ip: String, port: int = DEFAULT_PORT) -> bool:
 func disconnect_from_server():
 	if multiplayer_peer:
 		multiplayer_peer.close()
-	multiplayer.multiplayer_peer = null
+		multiplayer_peer = null
+	
+	if multiplayer.multiplayer_peer:
+		multiplayer.multiplayer_peer = null
+	
 	is_server = false
 	
 	# Stop server discovery if we were hosting
 	_stop_discovery_server()
+	
+	# Clear server info if we were hosting
+	if server_info.size() > 0:
+		server_info.clear()
 	
 	print("Disconnected from server")
 
@@ -102,9 +119,16 @@ func start_server_discovery():
 	available_servers.clear()
 	_discover_servers()
 
-func _start_discovery_server():
+func _start_discovery_server(server_port: int = DEFAULT_PORT):
 	udp_server = UDPServer.new()
-	udp_server.listen(DEFAULT_PORT + 1)
+	# Use a different port for UDP discovery to avoid conflicts
+	var discovery_port = server_port + 1000
+	var error = udp_server.listen(discovery_port)
+	if error != OK:
+		print("Failed to start UDP discovery server on port ", discovery_port, ": ", error)
+		return
+	
+	print("UDP discovery server started on port ", discovery_port)
 	broadcast_timer.start()
 
 func _stop_discovery_server():
@@ -133,36 +157,25 @@ func _discover_servers():
 	
 	# For local testing, discover all NetworkManager instances that are hosting servers
 	var all_network_managers = get_tree().get_nodes_in_group("network_manager")
-	if all_network_managers.is_empty():
-		# If no group exists, check all NetworkManager instances in the scene tree
-		_find_all_network_managers(get_tree().current_scene)
-	else:
-		for nm in all_network_managers:
-			if nm != self and nm.is_hosting():
-				available_servers.append(nm.get_server_info())
+	for nm in all_network_managers:
+		if nm != self and nm.is_hosting():
+			available_servers.append(nm.get_server_info())
 	
 	# Add this server if it's hosting
 	if is_server:
 		available_servers.append(server_info)
 	
 	# Send discovery request to local network for real network discovery
-	udp_client.connect_to_host("255.255.255.255", DEFAULT_PORT + 1)
+	udp_client.connect_to_host("255.255.255.255", DEFAULT_PORT + 1001)
 	udp_client.put_packet("DISCOVER_SERVERS".to_utf8_buffer())
 	
 	# Start a timer to collect responses
 	var discovery_timer = Timer.new()
-	discovery_timer.wait_time = 1.0  # Reduced time for faster testing
+	discovery_timer.wait_time = 1.0
 	discovery_timer.one_shot = true
 	discovery_timer.timeout.connect(_finish_discovery.bind(discovery_timer))
 	add_child(discovery_timer)
 	discovery_timer.start()
-
-func _find_all_network_managers(node: Node):
-	if node is NetworkManager and node != self and node.is_hosting():
-		available_servers.append(node.get_server_info())
-	
-	for child in node.get_children():
-		_find_all_network_managers(child)
 
 func _finish_discovery(timer: Timer):
 	# Collect any responses
@@ -178,7 +191,8 @@ func _finish_discovery(timer: Timer):
 # Multiplayer callbacks
 func _on_peer_connected(id: int):
 	print("Player connected: ", id)
-	server_info.current_players += 1
+	if is_server:
+		server_info.current_players += 1
 	player_joined.emit(id, "Player " + str(id))
 
 func _on_peer_disconnected(id: int):
@@ -190,6 +204,11 @@ func _on_peer_disconnected(id: int):
 func _on_connected_to_server():
 	print("Successfully connected to server")
 	connected_to_server.emit(true)
+	
+	# Automatically go to lobby when connected (for quick play and regular connections)
+	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
+	if scene_controller:
+		scene_controller.change_scene("lobby")
 
 func _on_connection_failed():
 	print("Failed to connect to server")
@@ -209,18 +228,38 @@ func get_available_servers() -> Array[Dictionary]:
 func is_hosting() -> bool:
 	return is_server
 
-# Debug function to test if server is discoverable
-func test_server_discovery():
-	print("=== TESTING SERVER DISCOVERY ===")
-	if is_server:
-		print("This instance is hosting a server:")
-		print("  Name: ", server_info.get("name", "Unknown"))
-		print("  Port: ", server_info.get("port", "Unknown"))
-		print("  Game Mode: ", server_info.get("game_mode", "Unknown"))
-		print("  Players: ", server_info.get("current_players", 0), "/", server_info.get("max_players", 0))
-		print("  UDP Server Active: ", udp_server != null)
-	else:
-		print("This instance is not hosting a server")
-		print("Starting discovery test...")
-		start_server_discovery()
-	print("=================================")
+# Quick play functionality - joins a random available server
+func quick_play() -> void:
+	print("Starting quick play...")
+	# Connect to server list updated signal if not already connected
+	if not server_list_updated.is_connected(_on_quick_play_server_list_updated):
+		server_list_updated.connect(_on_quick_play_server_list_updated)
+	
+	# Start server discovery
+	start_server_discovery()
+
+func _on_quick_play_server_list_updated(servers: Array):
+	# Disconnect the signal to avoid multiple calls
+	if server_list_updated.is_connected(_on_quick_play_server_list_updated):
+		server_list_updated.disconnect(_on_quick_play_server_list_updated)
+	
+	# Filter for servers with available slots
+	var joinable_servers = servers.filter(func(server): 
+		var current_players = server.get("current_players", 0)
+		var max_players = server.get("max_players", 10)
+		return current_players < max_players
+	)
+	
+	if joinable_servers.is_empty():
+		print("No available servers found for quick play")
+		# Could emit a signal here to show "No servers available" message
+		return
+	
+	# Pick a random server
+	var random_server = joinable_servers[randi() % joinable_servers.size()]
+	print("Quick play joining server: ", random_server.get("name", "Unknown"))
+	
+	# Connect to the server
+	var success = connect_to_server("127.0.0.1", random_server.get("port", DEFAULT_PORT))
+	if not success:
+		print("Failed to initiate quick play connection")

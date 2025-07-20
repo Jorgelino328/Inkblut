@@ -6,9 +6,6 @@ signal scene_changed(scene_name: String)
 @onready var network_manager: NetworkManager = $NetworkManager
 var current_scene: Node = null
 
-# Background servers for testing
-var background_servers: Array[NetworkManager] = []
-
 # UI scenes that go in the scene_container (Control)
 const UI_SCENES = {
 	"main_menu": "res://Scenes/UI/main_menu.tscn",
@@ -40,17 +37,8 @@ func _ready():
 	# Add to group so other scripts can find this controller
 	add_to_group("scene_controller")
 	
-	# Check for command line arguments for testing
-	var args = OS.get_cmdline_args()
-	if "--server" in args:
-		print("Starting as server...")
-		_start_test_server()
-	elif "--client" in args:
-		print("Starting as client...")
-		_start_test_client()
-	else:
-		# Start with main menu normally
-		change_scene("main_menu")
+	# Start with main menu
+	change_scene("main_menu")
 
 func change_scene(scene_name: String):
 	print("Attempting to change to scene: ", scene_name)
@@ -138,9 +126,6 @@ func _connect_main_menu_buttons():
 	var play_button = current_scene.get_node_or_null("MenuContainer/PlayButton")
 	var settings_button = current_scene.get_node_or_null("MenuContainer/SettingButton")
 	var quit_button = current_scene.get_node_or_null("MenuContainer/QuitButton")
-	var test_server_button = current_scene.get_node_or_null("MenuContainer/TestServerButton")
-	var test_client_button = current_scene.get_node_or_null("MenuContainer/TestClientButton")
-	var create_debug_server_button = current_scene.get_node_or_null("MenuContainer/CreateDebugServerButton")
 	
 	if play_button:
 		play_button.pressed.connect(_on_play_pressed)
@@ -150,12 +135,6 @@ func _connect_main_menu_buttons():
 		settings_button.pressed.connect(_on_settings_pressed)
 	if quit_button:
 		quit_button.pressed.connect(_on_quit_pressed)
-	if test_server_button:
-		test_server_button.pressed.connect(_on_test_server_pressed)
-	if test_client_button:
-		test_client_button.pressed.connect(_on_test_client_pressed)
-	if create_debug_server_button:
-		create_debug_server_button.pressed.connect(_on_create_debug_server_pressed)
 
 func _connect_mode_select_buttons():
 	var quick_game_button = current_scene.get_node_or_null("ModeContainer/QuickGameButton")
@@ -209,7 +188,8 @@ func _on_quit_pressed():
 	get_tree().quit()
 
 func _on_quick_game_pressed():
-	change_scene("test_scene")
+	print("Quick play initiated...")
+	network_manager.quick_play()
 
 func _on_find_game_pressed():
 	change_scene("find_game")
@@ -228,18 +208,6 @@ func _on_respawn_pressed():
 
 func _on_quit_to_main_menu_pressed():
 	change_scene("main_menu")
-
-func _on_test_server_pressed():
-	print("Starting test server...")
-	_start_test_server()
-
-func _on_test_client_pressed():
-	print("Starting test client...")
-	_start_test_client()
-
-func _on_create_debug_server_pressed():
-	print("Creating debug server in background...")
-	_create_background_server()
 
 func _on_create_lobby_pressed():
 	# Get the selected options from the custom match scene
@@ -262,21 +230,15 @@ func _on_create_lobby_pressed():
 	
 	var server_name = "Player's Lobby"
 	
-	# Connect to network manager signals
-	if not network_manager.server_created.is_connected(_on_server_created):
-		network_manager.server_created.connect(_on_server_created)
+	# Create the server (await since it's a coroutine)
+	var success = await network_manager.create_server(server_name, game_mode, map_name, max_players)
 	
-	# Create the server
-	network_manager.create_server(server_name, game_mode, map_name, max_players)
-
-func _on_server_created(success: bool):
 	if success:
 		print("Server created successfully!")
 		# Go to lobby to wait for players
 		change_scene("lobby")
 	else:
 		print("Failed to create server")
-		# Could show an error dialog here
 
 # Public function for other scripts to change scenes
 func go_to_scene(scene_name: String):
@@ -295,63 +257,22 @@ func change_scene_with_game_mode(scene_name: String, game_mode: String):
 		call_deferred("_set_game_mode_deferred", game_mode, scene_name)
 
 func _set_game_mode_deferred(game_mode: String, scene_name: String):
+	print("Setting game mode deferred: ", game_mode, " for scene: ", scene_name)
+	
 	if current_scene:
+		print("Current scene exists, looking for GameManager...")
 		var game_manager = current_scene.get_node_or_null("GameManager")
-		if game_manager and game_manager.has_method("set_game_mode"):
-			game_manager.set_game_mode(game_mode)
-			print("Set game mode to: ", game_mode, " for scene: ", scene_name)
+		if game_manager:
+			print("Found GameManager, checking for set_game_mode method...")
+			if game_manager.has_method("set_game_mode"):
+				game_manager.set_game_mode(game_mode)
+				print("Set game mode to: ", game_mode, " for scene: ", scene_name)
+			else:
+				print("GameManager found but no set_game_mode method")
 		else:
 			print("Warning: GameManager not found in scene: ", scene_name)
-			
-
-# Testing functions for command line
-func _start_test_server():
-	# Connect to network manager signals
-	if not network_manager.server_created.is_connected(_on_server_created):
-		network_manager.server_created.connect(_on_server_created)
-	
-	# Create a test server
-	network_manager.create_server("Test Server", "Free-For-All", "Test Map", 4)
-
-func _start_test_client():
-	# Skip menu and go directly to find game screen
-	change_scene("find_game")
-
-func _create_background_server():
-	# Create a separate network manager for background server
-	var bg_network_manager = NetworkManager.new()
-	add_child(bg_network_manager)
-	
-	# Generate a unique server name and port
-	var server_count = background_servers.size() + 1
-	var server_name = "Debug Server " + str(server_count)
-	var server_port = 7000 + server_count
-	
-	# Connect to success signal
-	bg_network_manager.server_created.connect(_on_background_server_created.bind(bg_network_manager, server_name))
-	
-	# Create the server
-	var success = bg_network_manager.create_server(
-		server_name,
-		"Free-For-All", 
-		"Debug Map", 
-		4, 
-		server_port
-	)
-	
-	if success:
-		background_servers.append(bg_network_manager)
-		print("Debug server created: ", server_name, " on port ", server_port)
+			print("Available children: ")
+			for child in current_scene.get_children():
+				print("  - ", child.name, " (", child.get_class(), ")")
 	else:
-		bg_network_manager.queue_free()
-		print("Failed to create debug server")
-
-func _on_background_server_created(network_manager: NetworkManager, server_name: String, success: bool):
-	if success:
-		print("Background server '", server_name, "' is now discoverable!")
-		print("You can now go to Find Game to see it listed")
-	else:
-		print("Background server '", server_name, "' failed to start")
-		# Remove from array and free the node
-		background_servers.erase(network_manager)
-		network_manager.queue_free()
+		print("ERROR: No current_scene when trying to set game mode")

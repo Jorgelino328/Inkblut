@@ -84,14 +84,6 @@ popup/item_3/id = 3
 layout_mode = 2
 text = "BACK"
 
-[node name="CreateTestServerButton" type="Button" parent="MenuContainerH/MenuContainerV"]
-layout_mode = 2
-text = "CREATE TEST SERVER"
-
-[node name="CreateFullServerButton" type="Button" parent="MenuContainerH/MenuContainerV"]
-layout_mode = 2
-text = "CREATE FULL SERVER"
-
 [node name="CheckboxContainer" type="HBoxContainer" parent="MenuContainerH/MenuContainerV"]
 layout_mode = 2
 theme_override_constants/separation = 31
