@@ -13,11 +13,15 @@ var _update_fn: Dictionary = {}
 var _noise: FastNoiseLite
 
 func _ready():
+	# Add to group for discovery
+	add_to_group("paintable_map")
+	
 	_noise = FastNoiseLite.new()
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_noise.frequency = noise_frequency
 
 func on_paint_splat(hit_pos, paint_color: Color, splat_radius):
+	print("Paint splat received at: ", hit_pos, " with color: ", paint_color, " radius: ", splat_radius)
 	var hit_local_pos = to_local(hit_pos)
 	var hit_coords = local_to_map(hit_local_pos)
 	

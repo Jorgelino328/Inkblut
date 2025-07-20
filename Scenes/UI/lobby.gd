@@ -181,7 +181,7 @@ func _start_game():
 	print("=== STARTING GAME ===")
 	
 	# Get the map and game mode info from network manager
-	var map_scene = "test_scene"  # Default fallback
+	var map_scene = "map_1"  # Default fallback
 	var game_mode = "FREE-FOR-ALL"  # Default fallback
 	
 	if network_manager:

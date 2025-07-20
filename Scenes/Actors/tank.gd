@@ -1,7 +1,11 @@
 class_name Tank extends CharacterBody2D
 
+# Tank health changed signal
+signal health_changed(health: int, max_health: int)
+
 @onready var anim = $AnimationPlayer
-@export var HP = 10
+@export var max_hp = 3
+@export var current_hp = 3
 @export var SPEED = 300.0
 @export var JUMP_VELOCITY = -400.0
 @export var paintable_map: TileMap
@@ -16,10 +20,17 @@ var network_velocity: Vector2
 var network_cannon_rotation: float
 var network_body_flip: bool
 var network_animation: String = "Idle"
+var is_dead: bool = false
 
 func _ready():
+	# Add to tanks group for discovery
+	add_to_group("tanks")
+	
 	# Set the player ID based on multiplayer authority
 	player_id = get_multiplayer_authority()
+	
+	# Initialize health
+	current_hp = max_hp
 	
 	# Initialize network variables
 	network_position = global_position
@@ -28,6 +39,9 @@ func _ready():
 	network_body_flip = $Body.flip_h
 
 func _physics_process(delta):
+	if is_dead:
+		return  # Don't process physics if dead
+		
 	if is_multiplayer_authority():
 		# Local player - process input and movement
 		_handle_local_input(delta)
@@ -122,25 +136,76 @@ func shoot():
 	get_tree().get_root().add_child(shot_instance)
 	if paintable_map:
 		shot_instance.connect("paint_splat", Callable(paintable_map, "on_paint_splat"))
+		print("Connected inkshot to paintable map: ", paintable_map.name)
+	else:
+		print("Warning: No paintable_map reference when shooting!")
 
 func _on_animation_finished(anim_name):
 	if (anim_name == "Jump"):
 		anim.play("Jump_Fall")
 
 func _on_hit(body):
-	HP -= 1
+	if is_dead:
+		return  # Already dead
+		
+	take_damage(1)
+
+@rpc("any_peer", "reliable", "call_local")
+func take_damage(damage: int):
+	if is_dead:
+		return
+		
+	current_hp -= damage
 	anim.play("Hit")
-	if HP <= 0:
+	
+	# Emit health_changed signal
+	emit_signal("health_changed", current_hp, max_hp)
+	
+	print("Player ", player_id, " took ", damage, " damage. HP: ", current_hp, "/", max_hp)
+	
+	if current_hp <= 0:
 		die()
 
 func die():
-	# Get reference to the main scene and show game over
-	var main_scene = get_tree().get_first_node_in_group("main")
-	if main_scene:
-		main_scene.show_game_over()
-	else:
-		# Fallback - just reload the scene
-		get_tree().reload_current_scene()
+	if is_dead:
+		return
+		
+	is_dead = true
+	current_hp = 0
+	
+	print("Player ", player_id, " died")
+	
+	# Notify game manager
+	var game_manager = get_tree().get_first_node_in_group("game_manager")
+	if game_manager:
+		game_manager.handle_player_death(player_id)
+	
+	# Disable physics and input
+	set_physics_process(false)
+	set_process_input(false)
+	
+	# Hide the tank or play death animation
+	visible = false
+
+func respawn():
+	"""Called when player respawns"""
+	is_dead = false
+	current_hp = max_hp
+	visible = true
+	
+	# Re-enable physics and input
+	set_physics_process(true)
+	set_process_input(true)
+	
+	# Emit health update signal
+	emit_signal("health_changed", current_hp, max_hp)
+	
+	print("Player ", player_id, " respawned")
 
 func _on_hit_floor(body):
 	anim.play("Jump_Land")
+
+func set_tank_color(color: Color):
+	"""Set the tank's color"""
+	modulate = color
+	print("Tank ", player_id, " color set to: ", color)

@@ -3,6 +3,11 @@ class_name GameManager extends Node
 signal game_started
 signal game_ended(winner)
 signal player_spawned(player_id: int, player_node: Tank)
+signal player_died(player_id: int)
+signal player_respawned(player_id: int)
+signal game_timer_updated(time_left: float)
+signal coverage_updated(coverage_data: Dictionary)
+signal game_state_synced(players_data: Dictionary, mode: String)
 
 var spawn_areas: Array[Area2D] = []
 @export var team_colors: Array[Color] = [
@@ -20,6 +25,21 @@ var players: Dictionary = {}  # player_id -> player data
 var game_mode: String = "FREE-FOR-ALL"
 var is_host: bool = false
 var tank_scene = preload("res://Scenes/Actors/tank.tscn")
+
+# Game state variables
+var game_active: bool = false
+var game_duration: float = 180.0  # 3 minutes default
+var time_remaining: float = 0.0
+var game_timer: Timer
+var coverage_update_timer: Timer
+var paintable_tilemap: TileMap
+
+# Respawn system
+var dead_players: Dictionary = {}  # player_id -> respawn_timer
+var respawn_delay: float = 10.0
+
+# Results tracking
+var final_results: Dictionary = {}
 
 func _ready():
 	print("=== GAMEMANAGER _READY ===")
@@ -39,7 +59,31 @@ func _ready():
 	is_host = multiplayer.is_server()
 	print("GameManager is_host: ", is_host)
 	
+	# Set up game timer
+	_setup_game_timer()
+	
+	# Set up coverage tracking
+	_setup_coverage_tracking()
+	
+	# Find paintable tilemap
+	call_deferred("_find_paintable_tilemap")
+	
 	# Don't auto-start the game, wait for set_game_mode to be called
+
+func _find_paintable_tilemap():
+	"""Find and store reference to the paintable tilemap"""
+	paintable_tilemap = get_tree().get_first_node_in_group("paintable_map")
+	if paintable_tilemap:
+		print("Found paintable tilemap: ", paintable_tilemap.name)
+	else:
+		print("Warning: Could not find paintable tilemap in group 'paintable_map'")
+		# Try again in a bit
+		await get_tree().create_timer(0.5).timeout
+		paintable_tilemap = get_tree().get_first_node_in_group("paintable_map")
+		if paintable_tilemap:
+			print("Found paintable tilemap on retry: ", paintable_tilemap.name)
+		else:
+			print("Error: Still could not find paintable tilemap")
 
 func _collect_spawn_areas():
 	"""Collect all Area2D nodes marked as spawn areas from the current scene."""
@@ -104,20 +148,55 @@ func start_game():
 	# Assign teams and colors based on game mode
 	_assign_teams_and_colors(connected_players)
 	
-	# Spawn players
-	print("=== SPAWNING PLAYERS ===")
-	for player_id in connected_players:
-		print("Spawning player: ", player_id)
-		spawn_player(player_id)
-		print("spawn_player called for player: ", player_id)
-	
-	# Sync game state to all clients
+	# Sync game state to all clients FIRST
 	print("=== SYNCING GAME STATE TO ALL CLIENTS ===")
 	for client_id in multiplayer.get_peers():
 		print("Syncing game state to client: ", client_id)
 		_sync_game_state_to_client.rpc_id(client_id, players, game_mode)
 	
+	# Wait a frame for sync to complete
+	await get_tree().process_frame
+	
+	# Host spawns all players locally (no RPC needed - clients spawn via sync)
+	print("=== HOST SPAWNING PLAYERS LOCALLY ===")
+	for player_id in connected_players:
+		print("Host spawning player locally: ", player_id)
+		spawn_player(player_id)
+		print("spawn_player called locally for player: ", player_id)
+	
+	# Start the game timer
+	start_game_timer(game_duration)
+	
 	game_started.emit()
+
+func _on_game_timer_timeout():
+	"""Called when the game timer reaches zero."""
+	time_remaining -= 1.0
+	print("Time remaining: ", time_remaining)
+	
+	# Update timer display on all clients
+	game_timer_updated.emit(time_remaining)
+	
+	if time_remaining <= 0:
+		print("Game time is up!")
+		_end_game()
+
+func _on_coverage_update_timeout():
+	"""Called periodically to update coverage data."""
+	var coverage_data = {}
+	
+	# Calculate coverage for each team
+	for player_id in players.keys():
+		var player_data = players[player_id]
+		if player_data.tank_node and is_instance_valid(player_data.tank_node):
+			var team = player_data.team
+			if not coverage_data.has(team):
+				coverage_data[team] = 0
+			# Add player's coverage area (dummy value for now)
+			coverage_data[team] += 1 
+	
+	# Emit coverage update signal
+	coverage_updated.emit(coverage_data)
 
 func _assign_teams_and_colors(player_ids: Array):
 	print("=== _ASSIGN_TEAMS_AND_COLORS ===")
@@ -136,484 +215,520 @@ func _assign_teams_and_colors(player_ids: Array):
 			_assign_ffa_mode(player_ids)
 
 func _assign_team_mode(player_ids: Array):
-	print("=== ASSIGNING TEAM MODE (COPY OF FFA) ===")
+	print("=== ASSIGNING TEAM MODE ===")
 	print("Player IDs to assign: ", player_ids)
-	# Copy FFA logic exactly but with team colors
+	# Assign players to teams 1 and 2
 	for i in range(player_ids.size()):
 		var player_id = player_ids[i]
 		# Use only red and blue colors for teams
 		var team_color_index = i % 2  # Alternate between 0 (red) and 1 (blue)
 		var color = team_colors[team_color_index]
-		var team = "Team A" if team_color_index == 0 else "Team B"
+		var team = 1 if team_color_index == 0 else 2  # Use integers 1 and 2
 		
 		players[player_id] = {
 			"id": player_id,
 			"team": team,
 			"color": color,
-			"tank_node": null
+			"tank_node": null,
+			"score": 0,
+			"is_alive": true,
+			"spawn_position": Vector2.ZERO
 		}
-		print("Assigned player ", player_id, " to ", team, " with color ", color)
+		print("Assigned player ", player_id, " to team ", team, " with color ", color)
 
 func _assign_ffa_mode(player_ids: Array):
 	print("=== ASSIGNING FFA MODE ===")
 	print("Player IDs to assign: ", player_ids)
-	# Each player gets their own color
+	# Each player gets their own color and is assigned to team 1 (for spawn purposes)
 	for i in range(player_ids.size()):
 		var player_id = player_ids[i]
 		var color = team_colors[i % team_colors.size()]
 		
 		players[player_id] = {
 			"id": player_id,
-			"team": "Individual",
+			"team": 1,  # Use team 1 for all FFA players for spawn logic
 			"color": color,
-			"tank_node": null
+			"tank_node": null,
+			"score": 0,
+			"is_alive": true,
+			"spawn_position": Vector2.ZERO
 		}
-		print("Assigned player ", player_id, " to Individual team with color ", color)
+		print("Assigned player ", player_id, " to team 1 (FFA) with color ", color)
 		
-@rpc("any_peer", "reliable", "call_local")
+func _setup_game_timer():
+	"""Set up the main game timer"""
+	game_timer = Timer.new()
+	game_timer.wait_time = 1.0  # Update every second
+	game_timer.timeout.connect(_on_game_timer_tick)
+	add_child(game_timer)
+
+func _setup_coverage_tracking():
+	"""Set up periodic coverage calculation"""
+	coverage_update_timer = Timer.new()
+	coverage_update_timer.wait_time = 2.0  # Update coverage every 2 seconds
+	coverage_update_timer.timeout.connect(_calculate_and_broadcast_coverage)
+	add_child(coverage_update_timer)
+
+func start_game_timer(duration: float = 180.0):
+	"""Start the game timer with specified duration"""
+	if not is_host:
+		return
+		
+	game_duration = duration
+	time_remaining = duration
+	game_active = true
+	
+	game_timer.start()
+	coverage_update_timer.start()
+	
+	print("Game timer started: ", duration, " seconds")
+	_sync_timer_start.rpc(duration)
+
+@rpc("authority", "reliable", "call_local") 
+func _sync_timer_start(duration: float):
+	"""Sync game timer start to all clients"""
+	time_remaining = duration
+	game_active = true
+	game_timer_updated.emit(time_remaining)
+
+func _on_game_timer_tick():
+	"""Handle game timer tick"""
+	if not is_host or not game_active:
+		return
+		
+	time_remaining -= 1.0
+	
+	if time_remaining <= 0:
+		time_remaining = 0
+		_end_game()
+	
+	# Broadcast timer update
+	_sync_timer_update.rpc(time_remaining)
+	game_timer_updated.emit(time_remaining)
+
+@rpc("authority", "reliable", "call_local")
+func _sync_timer_update(time_left: float):
+	"""Sync timer updates to all clients"""
+	time_remaining = time_left
+	game_timer_updated.emit(time_remaining)
+
+func _calculate_and_broadcast_coverage():
+	"""Calculate ink coverage and broadcast to all players"""
+	if not is_host or not paintable_tilemap:
+		return
+		
+	var coverage_data = _calculate_ink_coverage()
+	_sync_coverage_update.rpc(coverage_data)
+	coverage_updated.emit(coverage_data)
+
+@rpc("authority", "reliable", "call_local")
+func _sync_coverage_update(coverage_data: Dictionary):
+	"""Sync coverage data to all clients"""
+	coverage_updated.emit(coverage_data)
+
+func _calculate_ink_coverage() -> Dictionary:
+	"""Calculate ink coverage for each team/player"""
+	if not paintable_tilemap:
+		return {}
+	
+	var coverage_count: Dictionary = {}
+	var total_paintable_tiles = 0
+	
+	# Initialize counters for each team/player
+	for player_id in players:
+		var color = players[player_id].color
+		coverage_count[color] = 0
+	
+	# Count painted tiles by iterating through the tilemap
+	var used_rect = paintable_tilemap.get_used_rect()
+	
+	for x in range(used_rect.position.x, used_rect.position.x + used_rect.size.x):
+		for y in range(used_rect.position.y, used_rect.position.y + used_rect.size.y):
+			var coords = Vector2i(x, y)
+			var tile_data = paintable_tilemap.get_cell_tile_data(0, coords)
+			
+			if tile_data and tile_data.get_custom_data("is_paintable"):
+				total_paintable_tiles += 1
+				var tile_color = tile_data.modulate
+				
+				# Find matching player color
+				for player_id in players:
+					var player_color = players[player_id].color
+					if tile_color.is_equal_approx(player_color):
+						coverage_count[player_color] += 1
+						break
+	
+	# Calculate percentages
+	var coverage_percentages: Dictionary = {}
+	for color in coverage_count:
+		if total_paintable_tiles > 0:
+			coverage_percentages[color] = (coverage_count[color] * 100.0) / total_paintable_tiles
+		else:
+			coverage_percentages[color] = 0.0
+	
+	return {
+		"counts": coverage_count,
+		"percentages": coverage_percentages,
+		"total_tiles": total_paintable_tiles
+	}
+
+func handle_player_death(player_id: int):
+	"""Handle when a player dies"""
+	if player_id in dead_players:
+		return  # Already dead
+		
+	print("Player ", player_id, " died")
+	
+	# Remove player's tank from scene
+	if player_id in players and players[player_id].tank_node:
+		var tank = players[player_id].tank_node
+		tank.queue_free()
+		players[player_id].tank_node = null
+	
+	# Start respawn timer
+	dead_players[player_id] = respawn_delay
+	player_died.emit(player_id)
+	
+	if is_host:
+		_sync_player_death.rpc(player_id)
+
+@rpc("authority", "reliable", "call_local")
+func _sync_player_death(player_id: int):
+	"""Sync player death to all clients"""
+	player_died.emit(player_id)
+
+@rpc("authority", "reliable", "call_local")
+func _sync_player_respawn(player_id: int):
+	"""Sync player respawn to all clients"""
+	player_respawned.emit(player_id)
+
+func _process(delta):
+	"""Update respawn timers"""
+	if not is_host:
+		return
+		
+	# Update respawn timers for dead players
+	var players_to_respawn = []
+	
+	for player_id in dead_players:
+		dead_players[player_id] -= delta
+		if dead_players[player_id] <= 0:
+			players_to_respawn.append(player_id)
+	
+	# Respawn players whose timer expired
+	for player_id in players_to_respawn:
+		_respawn_player(player_id)
+
+func _respawn_player(player_id: int):
+	"""Respawn a dead player"""
+	if player_id not in dead_players:
+		print("Cannot respawn player ", player_id, " - not in dead_players list")
+		return
+		
+	print("Respawning player ", player_id)
+	print("Player data exists: ", player_id in players)
+	if player_id in players:
+		print("Player data: ", players[player_id])
+	
+	# Remove from dead players
+	dead_players.erase(player_id)
+	
+	# Spawn new tank
+	print("Calling spawn_player.rpc for respawn: ", player_id)
+	spawn_player.rpc(player_id)
+	
+	player_respawned.emit(player_id)
+	_sync_player_respawn.rpc(player_id)
+
+@rpc("any_peer", "reliable")
 func spawn_player(player_id: int):
+	"""Spawn a tank for the given player"""
 	print("=== SPAWN_PLAYER CALLED ===")
 	print("Player ID: ", player_id)
-	print("Is Host: ", is_host)
-	print("Current Multiplayer ID: ", multiplayer.get_unique_id())
-	print("Players dict has player: ", player_id in players)
+	print("My multiplayer ID: ", multiplayer.get_unique_id())
+	print("Is host: ", is_host)
+	print("Player data exists: ", player_id in players)
 	
-	if player_id in players:
-		var player_data = players[player_id]
+	# If player data doesn't exist yet, wait for it
+	if not players.has(player_id):
+		print("Player data not found for ", player_id, ", waiting for sync...")
+		var max_wait_time = 3.0  # Wait up to 3 seconds
+		var wait_time = 0.0
+		while not players.has(player_id) and wait_time < max_wait_time:
+			await get_tree().create_timer(0.1).timeout
+			wait_time += 0.1
 		
-		# Create tank instance
-		var tank = tank_scene.instantiate()
-		tank.name = "Player_" + str(player_id)
-		
-		# Set player authority
-		tank.set_multiplayer_authority(player_id)
-		
-		# Apply team color
-		tank.modulate = player_data.color
-		
-		# Find a safe spawn position
-		var spawn_position = _find_safe_spawn_position()
-		tank.global_position = spawn_position
-		
-		# Connect tank to paintable map
-		var paintable_map = get_tree().get_first_node_in_group("paintable_map")
-		if paintable_map:
-			tank.paintable_map = paintable_map
-		
-		# Add tank to scene - use the game scene (parent of this GameManager)
-		var game_scene = get_parent()
-		if game_scene:
-			game_scene.add_child(tank)
-			print("Added tank to game scene: ", game_scene.name)
-			print("Game scene children count: ", game_scene.get_child_count())
+		if not players.has(player_id):
+			print("Error: Player ", player_id, " data still not found after waiting")
+			return
 		else:
-			# Fallback to current scene if no parent
-			get_tree().current_scene.add_child(tank)
-			print("Added tank to current scene (fallback): ", get_tree().current_scene.name)
-		
-		# Store reference
-		players[player_id].tank_node = tank
-		
-		print("Spawned player ", player_id, " with color ", player_data.color, " at position ", spawn_position)
-		player_spawned.emit(player_id, tank)
+			print("Player data found for ", player_id, " after waiting")
+	
+	# Get player data
+	var player_data = players[player_id]
+	
+	# Find a spawn position
+	var spawn_pos = _get_spawn_position(player_data.team)
+	
+	# Load tank scene
+	var tank_scene = preload("res://Scenes/Actors/tank.tscn")
+	var tank_instance = tank_scene.instantiate()
+	
+	# Set up the tank
+	tank_instance.name = "Tank_" + str(player_id)
+	tank_instance.set_multiplayer_authority(player_id)
+	tank_instance.global_position = spawn_pos
+	tank_instance.player_id = player_id
+	
+	# Connect tank signals
+	tank_instance.health_changed.connect(_on_tank_health_changed.bind(player_id))
+	
+	# Set paintable map reference
+	if paintable_tilemap:
+		tank_instance.paintable_map = paintable_tilemap
+	
+	# Set tank color
+	tank_instance.set_tank_color(player_data.color)
+	print("Set tank ", player_id, " color to: ", player_data.color)
+	
+	# Add tank to scene
+	get_tree().current_scene.add_child(tank_instance)
+	
+	# Update player spawn position
+	player_data.spawn_position = spawn_pos
+	player_data.is_alive = true
+	
+	# Store tank reference
+	player_data.tank_node = tank_instance
+	
+	print("Tank spawned for player ", player_id, " at position ", spawn_pos)
+	player_spawned.emit(player_id, tank_instance)
 
-# RPC to sync existing players to a new client
-@rpc("call_remote")
-func _sync_existing_player_to_client(existing_player_id: int, player_data: Dictionary):
-	print("Syncing existing player ", existing_player_id, " to this client")
-	
-	# Add the existing player to our local players dict
-	players[existing_player_id] = player_data.duplicate()
-	
-	# Spawn the existing player locally
-	_spawn_existing_player_locally(existing_player_id, player_data)
-
-func _spawn_existing_player_locally(player_id: int, player_data: Dictionary):
-	print("Spawning existing player ", player_id, " locally")
-	
-	# Create tank instance
-	var tank = tank_scene.instantiate()
-	tank.name = "Player_" + str(player_id)
-	
-	# Set player authority
-	tank.set_multiplayer_authority(player_id)
-	
-	# Apply team color
-	tank.modulate = player_data.color
-	
-	# Find a safe spawn position
-	var spawn_position = _find_safe_spawn_position()
-	tank.global_position = spawn_position
-	
-	# Connect tank to paintable map
-	var paintable_map = get_tree().get_first_node_in_group("paintable_map")
-	if paintable_map:
-		tank.paintable_map = paintable_map
-	
-	# Add tank to scene - use the game scene (parent of this GameManager)
-	var game_scene = get_parent()
-	if game_scene:
-		game_scene.add_child(tank)
-		print("Added existing player tank to game scene: ", game_scene.name)
-		print("Game scene children count: ", game_scene.get_child_count())
+func _get_spawn_position(team: int) -> Vector2:
+	"""Get a spawn position for the given team"""
+	# Use available spawn areas if they exist
+	if spawn_areas.size() > 0:
+		var area = spawn_areas[randi() % spawn_areas.size()]
+		return area.global_position
 	else:
-		# Fallback to current scene if no parent
-		get_tree().current_scene.add_child(tank)
-		print("Added existing player tank to current scene (fallback): ", get_tree().current_scene.name)
-	
-	# Store reference
-	players[player_id].tank_node = tank
-	
-	print("Locally spawned existing player ", player_id, " with color ", player_data.color, " at position ", spawn_position)
-
-func _on_player_connected(id: int):
-	print("=== GameManager: Player connected: ", id)
-	if is_host:
-		# If game is already active, add the new player and spawn them
-		if is_game_active():
-			print("Game in progress, adding new player to game: ", id)
-			
-			# Add new player to players dictionary with proper team assignment
-			_assign_new_player_to_game(id)
-			
-			# Sync current state to new client (including existing players)
-			_sync_game_state_to_client.rpc_id(id, players, game_mode)
-			
-			# Spawn the new player on the host
-			print("Spawning new player on host: ", id)
-			spawn_player(id)
-			
-			# Tell all existing clients to spawn the new player too
-			print("Telling clients to spawn new player: ", id)
-			for peer_id in multiplayer.get_peers():
-				if peer_id != id:  # Don't tell the new client to spawn themselves again
-					_spawn_new_player_for_client.rpc_id(peer_id, id, players[id])
+		# Default spawn positions if no spawn areas defined
+		if team == 1:
+			return Vector2(100, 300)
 		else:
-			print("Game not active yet, player will be added when game starts")
+			return Vector2(1000, 300)
 
-func _on_player_disconnected(id: int):
-	print("=== GameManager: Player disconnected: ", id)
-	# Remove player from game if they existed
-	if id in players:
-		var player_data = players[id]
-		if player_data.tank_node:
-			player_data.tank_node.queue_free()
-		players.erase(id)
-		print("Removed player ", id, " from game")
-
-# RPC to sync entire game state to new client
-@rpc("call_remote", "reliable")
-func _sync_game_state_to_client(player_data: Dictionary, mode: String):
-	print("=== SYNCING GAME STATE FROM SERVER ===")
-	print("Received players data: ", player_data)
-	print("Game mode: ", mode)
-	
-	# Set our game mode
-	game_mode = mode
-	
-	# Clear existing players
-	players.clear()
-	
-	# Add all players from server and spawn them all
-	for player_id in player_data:
-		players[player_id] = player_data[player_id].duplicate()
-		# Don't include tank_node reference as it's not serializable
-		players[player_id].tank_node = null
+func _on_tank_health_changed(player_id: int, health: int, max_health: int):
+	"""Handle tank health changes"""
+	if players.has(player_id):
+		players[player_id].health = health
 		
-		# Spawn ALL players locally (including self)
-		print("Spawning player locally: ", player_id)
-		call_deferred("spawn_player", player_id)
+	# Update HUD if this is the local player
+	if player_id == multiplayer.get_unique_id():
+		# The tank itself should handle HUD updates via signals
+		pass
+
+func _end_game():
+	"""End the game and determine winner"""
+	if not is_host:
+		return
+		
+	print("Game ending...")
+	game_active = false
+	game_timer.stop()
+	coverage_update_timer.stop()
 	
-	print("Game state synchronized")
+	# Calculate final coverage
+	final_results = _calculate_ink_coverage()
+	
+	# Determine winner
+	var winner_data = _determine_winner()
+	
+	print("Game ended. Winner: ", winner_data)
+	
+	# Broadcast game end
+	_sync_game_end.rpc(final_results, winner_data)
+	game_ended.emit(winner_data)
 
-
-func get_player_data(player_id: int) -> Dictionary:
-	return players.get(player_id, {})
-
-func get_all_players() -> Dictionary:
-	return players
-
-func end_game(winner = null):
-	print("Game ended. Winner: ", winner)
+@rpc("authority", "reliable", "call_local")
+func _sync_game_end(results: Dictionary, winner: Dictionary):
+	"""Sync game end to all clients"""
+	final_results = results
 	game_ended.emit(winner)
-	
-	# Clean up players
-	for player_data in players.values():
-		if player_data.tank_node and is_instance_valid(player_data.tank_node):
-			player_data.tank_node.queue_free()
-	
-	players.clear()
-	
-	# Return to lobby or menu
-	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
-	if scene_controller:
-		scene_controller.change_scene("game_over")
 
-# RPC to sync new player data to the client so they can spawn themselves
-@rpc("call_remote")
-func _sync_new_player_to_client(player_id: int, player_data: Dictionary):
-	print("Received my player data: ", player_id, " with color ", player_data.color)
+func _determine_winner() -> Dictionary:
+	"""Determine the winner based on coverage"""
+	if final_results.is_empty():
+		return {"type": "tie", "message": "No data available"}
 	
-	# Add to local players dict
-	players[player_id] = player_data.duplicate()
+	var percentages = final_results.get("percentages", {})
 	
-	# Spawn myself locally
-	_spawn_existing_player_locally(player_id, player_data)
-	print("Spawned myself (", player_id, ") locally")
-
-func can_start_game() -> bool:
-	"""Check if the game can start based on current players and game mode"""
-	var connected_players = [multiplayer.get_unique_id()]
-	connected_players.append_array(multiplayer.get_peers())
-	
-	match game_mode:
-		"TEAM", "TEAM DEATHMATCH":
-			# For team modes, we need at least 2 players and equal teams
-			if connected_players.size() < 2:
-				print("Cannot start team game: Need at least 2 players")
-				return false
-			
-			# Team games should have an even number of players for balanced teams
-			if connected_players.size() % 2 != 0:
-				print("Cannot start team game: Need even number of players for balanced teams")
-				return false
-			
-			return true
-		
-		"FREE-FOR-ALL":
-			# FFA can start with any number of players (minimum 1)
-			return connected_players.size() >= 1
-		
-		_:
-			return true
-
-func get_team_balance_info() -> Dictionary:
-	"""Get information about current team balance"""
-	var connected_players = [multiplayer.get_unique_id()]
-	connected_players.append_array(multiplayer.get_peers())
-	var total_players = connected_players.size()
-	
-	match game_mode:
-		"TEAM", "TEAM DEATHMATCH":
-			var team_a_count = (total_players + 1) / 2  # Ceiling division
-			var team_b_count = total_players / 2        # Floor division
-			
-			return {
-				"total_players": total_players,
-				"team_a_count": team_a_count,
-				"team_b_count": team_b_count,
-				"is_balanced": total_players % 2 == 0,
-				"needs_more_players": total_players < 2
-			}
-		
-		"FREE-FOR-ALL":
-			return {
-				"total_players": total_players,
-				"can_start": total_players >= 1
-			}
-		
-		_:
-			return {"total_players": total_players}
-
-func _find_safe_spawn_position() -> Vector2:
-	"""Find a safe spawn position from available spawn areas."""
-	if spawn_areas.is_empty():
-		print("Warning: No spawn areas available, using fallback position")
-		return Vector2(500, 400)  # Fallback position
-	
-	var max_attempts = 50
-	var attempts = 0
-	
-	while attempts < max_attempts:
-		# Pick a random spawn area
-		var spawn_area = spawn_areas[randi() % spawn_areas.size()]
-		
-		# Get a random position within this area
-		var spawn_position = _get_random_position_in_area(spawn_area)
-		
-		# Check if this position is safe (no walls, no other players)
-		if _is_spawn_position_safe(spawn_position):
-			return spawn_position
-		
-		attempts += 1
-	
-	# If we couldn't find a safe position, try to push out of walls
-	print("Could not find safe spawn position after ", max_attempts, " attempts, trying to push out of walls")
-	var fallback_area = spawn_areas[0]
-	var fallback_position = _get_random_position_in_area(fallback_area)
-	return _push_out_of_walls(fallback_position)
-
-func _get_random_position_in_area(area: Area2D) -> Vector2:
-	"""Get a random position within an Area2D."""
-	# Get the collision shape
-	var collision_shape = null
-	for child in area.get_children():
-		if child is CollisionShape2D:
-			collision_shape = child
-			break
-	
-	if not collision_shape:
-		print("Warning: Spawn area ", area.name, " has no CollisionShape2D")
-		return area.global_position
-	
-	var shape = collision_shape.shape
-	if shape is RectangleShape2D:
-		# Get rectangle bounds
-		var rect_shape = shape as RectangleShape2D
-		var size = rect_shape.size
-		var half_size = size * 0.5
-		
-		# Generate random position within rectangle
-		var local_pos = Vector2(
-			randf_range(-half_size.x, half_size.x),
-			randf_range(-half_size.y, half_size.y)
-		)
-		
-		# Transform to world position
-		return area.global_position + collision_shape.position + local_pos
-	elif shape is CircleShape2D:
-		# Get circle bounds
-		var circle_shape = shape as CircleShape2D
-		var radius = circle_shape.radius
-		
-		# Generate random position within circle
-		var angle = randf() * 2 * PI
-		var distance = randf() * radius
-		var local_pos = Vector2(cos(angle), sin(angle)) * distance
-		
-		# Transform to world position
-		return area.global_position + collision_shape.position + local_pos
+	if game_mode == "TEAM DEATHMATCH":
+		return _determine_team_winner(percentages)
 	else:
-		print("Warning: Unsupported collision shape type for spawn area ", area.name)
-		return area.global_position
+		return _determine_ffa_winner(percentages)
 
-func _is_spawn_position_safe(position: Vector2) -> bool:
-	"""Check if a spawn position is safe (no walls, no other players)."""
-	# Get world from the map scene (parent of GameManager)
-	var map_scene = get_parent()
-	if not map_scene is CanvasItem:
-		print("Warning: Map scene is not a CanvasItem, cannot perform physics queries")
-		return true
+func _determine_team_winner(percentages: Dictionary) -> Dictionary:
+	"""Determine winner for team mode"""
+	var team_totals = {1: 0.0, 2: 0.0}
 	
-	var space_state = map_scene.get_world_2d().direct_space_state
+	# Sum coverage for each team
+	for player_id in players:
+		var player_data = players[player_id]
+		var team = player_data.team
+		var color = player_data.color
+		
+		if color in percentages:
+			if team in team_totals:
+				team_totals[team] += percentages[color]
 	
-	# Check for walls using physics raycast in multiple directions
-	var directions = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT,
-					  Vector2(1, 1).normalized(), Vector2(-1, 1).normalized(),
-					  Vector2(1, -1).normalized(), Vector2(-1, -1).normalized()]
+	# Find winning team
+	if team_totals[1] > team_totals[2]:
+		return {"type": "team", "winner": "Team 1", "coverage": team_totals[1]}
+	elif team_totals[2] > team_totals[1]:
+		return {"type": "team", "winner": "Team 2", "coverage": team_totals[2]}
+	else:
+		return {"type": "tie", "message": "Teams tied!"}
+
+func _determine_ffa_winner(percentages: Dictionary) -> Dictionary:
+	"""Determine winner for free-for-all mode"""
+	var highest_coverage = 0.0
+	var winner_player_id = -1
 	
-	var tank_radius = 32.0  # Approximate tank size
+	# Find player with highest coverage
+	for player_id in players:
+		var color = players[player_id].color
+		if color in percentages:
+			var coverage = percentages[color]
+			if coverage > highest_coverage:
+				highest_coverage = coverage
+				winner_player_id = player_id
 	
-	for direction in directions:
-		var query = PhysicsRayQueryParameters2D.create(position, position + direction * tank_radius)
-		query.collision_mask = 1  # Assuming walls are on collision layer 1
-		var result = space_state.intersect_ray(query)
-		if result:
-			return false  # Found a wall nearby
+	if winner_player_id != -1:
+		return {
+			"type": "player", 
+			"winner_id": winner_player_id,
+			"coverage": highest_coverage
+		}
+	else:
+		return {"type": "tie", "message": "No clear winner"}
+
+func get_time_remaining() -> float:
+	"""Get remaining game time"""
+	return time_remaining
+
+func get_coverage_data() -> Dictionary:
+	"""Get current coverage data"""
+	if is_host and paintable_tilemap:
+		return _calculate_ink_coverage()
+	else:
+		return {}
+
+func force_end_game():
+	"""Force end the current game (admin function)"""
+	if is_host:
+		_end_game()
+
+# Multiplayer connection handlers
+func _on_player_connected(peer_id: int):
+	"""Called when a player connects to the multiplayer session"""
+	print("=== GAMEMANAGER: _on_player_connected CALLED ===")
+	print("=== GAMEMANAGER: Player connected: ", peer_id)
+	print("Game active: ", game_active)
+	print("Is host: ", is_host)
 	
-	# Check for overlapping with existing players
+	# Add the new player to our tracking
+	if not players.has(peer_id):
+		var assigned_team = _assign_team(peer_id)
+		var assigned_color = _get_team_color(assigned_team)
+		if game_mode == "FREE-FOR-ALL":
+			# For FFA, assign unique colors
+			assigned_color = team_colors[len(players) % team_colors.size()]
+		
+		players[peer_id] = {
+			"id": peer_id,
+			"team": assigned_team,
+			"color": assigned_color,
+			"score": 0,
+			"is_alive": true,
+			"spawn_position": Vector2.ZERO
+		}
+		print("Added new player ", peer_id, " with team ", assigned_team, " and color ", assigned_color)
+	
+	# If game is running, sync game state to the new client and spawn the new player on host
+	if game_active:
+		print("=== HOST: HANDLING NEW PLAYER CONNECTION ===")
+		# First, sync game state to the new client (client will spawn all players including themselves)
+		print("Syncing game state to new client: ", peer_id)
+		_sync_game_state_to_client.rpc_id(peer_id, players, game_mode)
+		
+		# Then spawn the new player locally on the host (host doesn't receive the sync)
+		print("Host spawning new player locally: ", peer_id)
+		spawn_player(peer_id)
+
+func _on_player_disconnected(peer_id: int):
+	"""Called when a player disconnects from the multiplayer session"""
+	print("Player disconnected: ", peer_id)
+	
+	# Remove player from tracking
+	if players.has(peer_id):
+		players.erase(peer_id)
+	
+	# Remove any spawned tank for this player
+	var tank_node = get_node_or_null("Tank_" + str(peer_id))
+	if tank_node:
+		tank_node.queue_free()
+
+func _assign_team(player_id: int) -> int:
+	"""Assign a team to a new player"""
+	# Simple alternating team assignment
+	var team1_count = 0
+	var team2_count = 0
+	
 	for player_data in players.values():
-		if player_data.tank_node and is_instance_valid(player_data.tank_node):
-			var other_pos = player_data.tank_node.global_position
-			var distance = position.distance_to(other_pos)
-			if distance < tank_radius * 2:
-				return false  # Too close to another player
+		if player_data.team == 1:
+			team1_count += 1
+		elif player_data.team == 2:
+			team2_count += 1
 	
-	return true
+	# Assign to the team with fewer players
+	return 1 if team1_count <= team2_count else 2
 
-func _push_out_of_walls(position: Vector2) -> Vector2:
-	"""Try to push a position out of walls if it's inside them."""
-	# Get world from the map scene (parent of GameManager)
-	var map_scene = get_parent()
-	if not map_scene is CanvasItem:
-		print("Warning: Map scene is not a CanvasItem, cannot perform physics queries")
-		return position
-	
-	var space_state = map_scene.get_world_2d().direct_space_state
-	var tank_radius = 32.0
-	var max_push_attempts = 10
-	var push_distance = 16.0
-	
-	var current_pos = position
-	
-	for attempt in range(max_push_attempts):
-		var is_in_wall = false
-		var push_direction = Vector2.ZERO
-		
-		# Check all directions for walls
-		var directions = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT,
-						  Vector2(1, 1).normalized(), Vector2(-1, 1).normalized(),
-						  Vector2(1, -1).normalized(), Vector2(-1, -1).normalized()]
-		
-		for direction in directions:
-			var query = PhysicsRayQueryParameters2D.create(current_pos, current_pos + direction * tank_radius)
-			query.collision_mask = 1
-			var result = space_state.intersect_ray(query)
-			if result:
-				is_in_wall = true
-				# Push away from the wall
-				push_direction -= direction
-		
-		if not is_in_wall:
-			break
-		
-		# Normalize and apply push
-		if push_direction.length() > 0:
-			push_direction = push_direction.normalized()
-			current_pos += push_direction * push_distance
-		else:
-			# Random push if we can't determine direction
-			var random_angle = randf() * 2 * PI
-			current_pos += Vector2(cos(random_angle), sin(random_angle)) * push_distance
-	
-	return current_pos
-
-func is_game_active() -> bool:
-	"""Check if the game is currently active (players have been spawned)"""
-	return players.size() > 0 and players.values().any(func(p): return p.tank_node != null)
-
-# RPC to tell existing clients to spawn a new player
-@rpc("call_remote", "reliable")
-func _spawn_new_player_for_client(player_id: int, player_data: Dictionary):
-	print("=== SPAWNING NEW PLAYER FOR CLIENT ===")
-	print("Player ID: ", player_id)
-	print("Player data: ", player_data)
-	
-	# Add new player to local players dict
-	players[player_id] = player_data.duplicate()
-	players[player_id].tank_node = null
-	
-	# Spawn the new player locally
-	spawn_player(player_id)
-
-func _assign_new_player_to_game(player_id: int):
-	"""Assign a new player to the appropriate team based on current game mode"""
-	print("Assigning new player ", player_id, " to game mode: ", game_mode)
-	
-	match game_mode:
-		"TEAM DEATHMATCH", "TEAM":
-			# For team modes, assign alternating teams
-			var team_color_index = players.size() % 2
-			var assigned_team = "Team A" if team_color_index == 0 else "Team B"
-			var assigned_color = team_colors[team_color_index]
-			
-			players[player_id] = {
-				"id": player_id,
-				"team": assigned_team,
-				"color": assigned_color,
-				"tank_node": null
-			}
-			
-			print("Assigned new player ", player_id, " to ", assigned_team, " with color ", assigned_color)
-			
+func _get_team_color(team_id: int) -> Color:
+	"""Get the color for a team"""
+	match team_id:
+		1:
+			return Color.BLUE
+		2:
+			return Color.ORANGE
 		_:
-			# For FFA and default, assign individual team with unique color
-			var color = team_colors[players.size() % team_colors.size()]
-			players[player_id] = {
-				"id": player_id,
-				"team": "Individual",
-				"color": color,
-				"tank_node": null
-			}
-			
-			print("Assigned new player ", player_id, " to Individual with color ", color)
+			return Color.WHITE
+
+@rpc("any_peer", "call_local", "reliable")
+func _sync_game_state_to_client(players_data: Dictionary, mode: String):
+	"""Sync game state to a specific client"""
+	if not multiplayer.is_server():
+		print("Received game state sync - Players: ", players_data.size(), ", Mode: ", mode)
+		print("My multiplayer ID: ", multiplayer.get_unique_id())
+		
+		# Update local players data
+		players = players_data
+		game_mode = mode
+		
+		# Spawn ALL existing players on this client EXCEPT ourselves 
+		print("About to spawn players from sync. Players list:")
+		for player_id in players.keys():
+			print("  - Player ", player_id, " (team: ", players[player_id].team, ", color: ", players[player_id].color, ")")
+		
+		for player_id in players.keys():
+			if player_id != multiplayer.get_unique_id():
+				print("Spawning from sync: Player ", player_id)
+				spawn_player(player_id)
+			else:
+				print("Skipping self spawn from sync: Player ", player_id)
+		
+		# Now spawn ourselves (the new client)
+		print("New client spawning self: ", multiplayer.get_unique_id())
+		spawn_player(multiplayer.get_unique_id())
+		
+		# Update UI if needed
+		game_state_synced.emit(players_data, mode)

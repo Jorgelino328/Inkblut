@@ -1,0 +1,147 @@
+[gd_scene load_steps=3 format=3 uid="uid://b2lxj8t4v6n0y"]
+
+[ext_resource type="Theme" uid="uid://dyswh45trxwxj" path="res://Assets/Themes/inkblut_classic.tres" id="1_theme"]
+[ext_resource type="Script" path="res://Scenes/UI/game_results.gd" id="2_script"]
+
+[node name="GameResults" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_theme")
+script = ExtResource("2_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.1, 0.15, 0.95)
+
+[node name="MainContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 50.0
+offset_top = 50.0
+offset_right = -50.0
+offset_bottom = -50.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleContainer" type="VBoxContainer" parent="MainContainer"]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="GameEndedLabel" type="Label" parent="MainContainer/TitleContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 48
+text = "MATCH ENDED"
+horizontal_alignment = 1
+
+[node name="WinnerLabel" type="Label" parent="MainContainer/TitleContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Winner: Player 1"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="MainContainer"]
+layout_mode = 2
+
+[node name="ResultsContainer" type="HBoxContainer" parent="MainContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ScoreboardPanel" type="Panel" parent="MainContainer/ResultsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ScoreboardContainer" type="VBoxContainer" parent="MainContainer/ResultsContainer/ScoreboardPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ScoreboardTitle" type="Label" parent="MainContainer/ResultsContainer/ScoreboardPanel/ScoreboardContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "FINAL RESULTS"
+horizontal_alignment = 1
+
+[node name="HSeparator2" type="HSeparator" parent="MainContainer/ResultsContainer/ScoreboardPanel/ScoreboardContainer"]
+layout_mode = 2
+
+[node name="ScoreList" type="VBoxContainer" parent="MainContainer/ResultsContainer/ScoreboardPanel/ScoreboardContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="StatsPanel" type="Panel" parent="MainContainer/ResultsContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StatsContainer" type="VBoxContainer" parent="MainContainer/ResultsContainer/StatsPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StatsTitle" type="Label" parent="MainContainer/ResultsContainer/StatsPanel/StatsContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "MATCH STATISTICS"
+horizontal_alignment = 1
+
+[node name="HSeparator3" type="HSeparator" parent="MainContainer/ResultsContainer/StatsPanel/StatsContainer"]
+layout_mode = 2
+
+[node name="TotalCoverageLabel" type="Label" parent="MainContainer/ResultsContainer/StatsPanel/StatsContainer"]
+layout_mode = 2
+text = "Total Area Covered: 0%"
+
+[node name="MatchDurationLabel" type="Label" parent="MainContainer/ResultsContainer/StatsPanel/StatsContainer"]
+layout_mode = 2
+text = "Match Duration: 3:00"
+
+[node name="PlayerCountLabel" type="Label" parent="MainContainer/ResultsContainer/StatsPanel/StatsContainer"]
+layout_mode = 2
+text = "Players: 0"
+
+[node name="GameModeLabel" type="Label" parent="MainContainer/ResultsContainer/StatsPanel/StatsContainer"]
+layout_mode = 2
+text = "Game Mode: Free-for-All"
+
+[node name="HSeparator4" type="HSeparator" parent="MainContainer"]
+layout_mode = 2
+
+[node name="ButtonContainer" type="HBoxContainer" parent="MainContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="RematchButton" type="Button" parent="MainContainer/ButtonContainer"]
+layout_mode = 2
+text = " Play Again "
+
+[node name="LobbyButton" type="Button" parent="MainContainer/ButtonContainer"]
+layout_mode = 2
+text = " Back to Lobby "
+
+[node name="QuitButton" type="Button" parent="MainContainer/ButtonContainer"]
+layout_mode = 2
+text = " Quit Game "

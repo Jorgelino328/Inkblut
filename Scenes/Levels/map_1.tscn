@@ -1,8 +1,11 @@
-[gd_scene load_steps=10 format=3 uid="uid://bje6ke5opwe4r"]
+[gd_scene load_steps=13 format=3 uid="uid://bje6ke5opwe4r"]
 
 [ext_resource type="TileSet" uid="uid://utj8sukqowuk" path="res://Scenes/Levels/test_tileset.tres" id="1_o7rkv"]
 [ext_resource type="Script" path="res://Scenes/TileLogic/paintable_walls.gd" id="2_s7sns"]
-[ext_resource type="Script" path="res://Scenes/game_manager.gd" id="3_game_manager"]
+[ext_resource type="PackedScene" uid="uid://c0f5h4jv6q2bw" path="res://Scenes/game_manager.tscn" id="3_game_manager"]
+[ext_resource type="PackedScene" path="res://Scenes/UI/game_hud.tscn" id="4_game_hud"]
+[ext_resource type="PackedScene" path="res://Scenes/UI/game_results.tscn" id="5_game_results"]
+[ext_resource type="Script" path="res://Scenes/Levels/map_1.gd" id="6_map1_script"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(120, 120)
@@ -23,6 +26,7 @@ size = Vector2(150, 100)
 size = Vector2(150, 100)
 
 [node name="Map1" type="Node2D"]
+script = ExtResource("6_map1_script")
 
 [node name="ColorRect" type="ColorRect" parent="."]
 offset_left = -10.0
@@ -85,6 +89,11 @@ position = Vector2(400, 450)
 position = Vector2(200, -114)
 shape = SubResource("RectangleShape2D_6")
 
-[node name="GameManager" type="Node" parent="."]
-script = ExtResource("3_game_manager")
-team_colors = null
+[node name="GameManager" parent="." instance=ExtResource("3_game_manager")]
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="GameHUD" parent="UI" instance=ExtResource("4_game_hud")]
+
+[node name="GameResults" parent="UI" instance=ExtResource("5_game_results")]
+visible = false

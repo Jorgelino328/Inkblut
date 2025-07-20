@@ -24,12 +24,14 @@ func _ready():
 
 func _on_collision(body):
 	if body is Tank and body != shooter_node:
-		body.HP -= 1
+		# Call the tank's take_damage function
+		body.take_damage.rpc(1)
 		queue_free()
 		return
 	elif body != shooter_node:
 		linear_velocity = Vector2.ZERO
 		anim.play("Shoot_Splatter")
+		print("Inkshot hit surface, emitting paint_splat with color: ", ink_color)
 		emit_signal("paint_splat", global_position, ink_color, 10)
 
 func _on_animation_finished(anim_name):

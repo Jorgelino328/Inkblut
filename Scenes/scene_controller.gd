@@ -20,7 +20,6 @@ const UI_SCENES = {
 
 # Game scenes that replace the entire scene tree
 const GAME_SCENES = {
-	"test_scene": "res://Scenes/test_scene.tscn",
 	"map_1": "res://Scenes/Levels/map_1.tscn",
 	"map_2": "res://Scenes/Levels/map_2.tscn",
 	"map_3": "res://Scenes/Levels/map_3.tscn"
@@ -54,7 +53,7 @@ func change_scene(scene_name: String):
 	# Also clean up any game scenes that might be siblings to this controller
 	if get_parent():
 		for child in get_parent().get_children():
-			if child != self and child.name in ["map_1", "map_2", "map_3", "test_scene"]:
+			if child != self and child.name in ["map_1", "map_2", "map_3"]:
 				print("Cleaning up old game scene: ", child.name)
 				child.queue_free()
 	
@@ -136,10 +135,10 @@ func change_scene(scene_name: String):
 			print("Failed to instantiate scene: ", scene_name)
 	else:
 		print("Failed to load scene resource: ", scene_path)
-		print("Falling back to test_scene...")
-		# Fallback to test_scene if map loading fails
+		print("Falling back to map_1...")
+		# Fallback to map_1 if map loading fails
 		if scene_name.begins_with("map_"):
-			change_scene("test_scene")
+			change_scene("map_1")
 
 func _connect_scene_buttons(scene_name: String):
 	match scene_name:
@@ -233,7 +232,7 @@ func _on_back_to_mode_select_pressed():
 	change_scene("mode_select")
 
 func _on_respawn_pressed():
-	change_scene("test_scene")
+	change_scene("map_1")
 
 func _on_quit_to_main_menu_pressed():
 	change_scene("global_lobby")
