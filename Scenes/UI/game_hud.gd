@@ -47,10 +47,13 @@ func _process(_delta):
 	# Update health display if we have a local player
 	if local_player and is_instance_valid(local_player):
 		_update_health_display()
-	
-	# Update respawn timer if player is dead
-	if local_player and local_player.is_dead:
-		_update_respawn_display()
+		
+		# Update respawn timer if player is dead
+		if local_player.is_dead:
+			_update_respawn_display()
+	else:
+		# Tank reference is invalid, try to find it again
+		_find_local_player()
 
 func _update_health_display():
 	"""Update health bar and label"""
@@ -72,7 +75,7 @@ func _update_health_display():
 
 func _update_respawn_display():
 	"""Update respawn countdown display"""
-	if not game_manager:
+	if not game_manager or not local_player or not is_instance_valid(local_player):
 		return
 		
 	var player_id = local_player.player_id
@@ -96,7 +99,7 @@ func _on_timer_updated(time_left: float):
 
 func _on_coverage_updated(coverage_data: Dictionary):
 	"""Update coverage display for local player"""
-	if not local_player or not coverage_data.has("percentages"):
+	if not local_player or not is_instance_valid(local_player) or not coverage_data.has("percentages"):
 		return
 	
 	var player_color = local_player.modulate
@@ -120,13 +123,22 @@ func _on_coverage_updated(coverage_data: Dictionary):
 
 func _on_player_died(player_id: int):
 	"""Handle player death"""
-	if local_player and local_player.player_id == player_id:
+	if local_player and is_instance_valid(local_player) and local_player.player_id == player_id:
 		# Show respawn UI
 		respawn_container.visible = true
+	elif not is_instance_valid(local_player):
+		# Tank reference is invalid, try to find it again
+		_find_local_player()
 
 func _on_player_respawned(player_id: int):
 	"""Handle player respawn"""
-	if local_player and local_player.player_id == player_id:
+	# Always try to find the local player after any respawn
+	# This ensures we get the new tank instance
+	var old_player_id = -1
+	if local_player and is_instance_valid(local_player):
+		old_player_id = local_player.player_id
+	
+	if old_player_id == player_id or not is_instance_valid(local_player):
 		# Hide respawn UI
 		respawn_container.visible = false
 		

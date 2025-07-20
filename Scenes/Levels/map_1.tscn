@@ -3,7 +3,7 @@
 [ext_resource type="TileSet" uid="uid://utj8sukqowuk" path="res://Scenes/Levels/test_tileset.tres" id="1_o7rkv"]
 [ext_resource type="Script" path="res://Scenes/TileLogic/paintable_walls.gd" id="2_s7sns"]
 [ext_resource type="PackedScene" uid="uid://c0f5h4jv6q2bw" path="res://Scenes/game_manager.tscn" id="3_game_manager"]
-[ext_resource type="PackedScene" path="res://Scenes/UI/game_hud.tscn" id="4_game_hud"]
+[ext_resource type="PackedScene" uid="uid://bslej8clt4cyx" path="res://Scenes/UI/game_hud.tscn" id="4_game_hud"]
 [ext_resource type="PackedScene" path="res://Scenes/UI/game_results.tscn" id="5_game_results"]
 [ext_resource type="Script" path="res://Scenes/Levels/map_1.gd" id="6_map1_script"]
 

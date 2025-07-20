@@ -24,7 +24,7 @@ func _ready():
 
 func _on_collision(body):
 	if body is Tank and body != shooter_node:
-		# Call the tank's take_damage function
+		# Call damage - tank has cooldown protection against double damage
 		body.take_damage.rpc(1)
 		queue_free()
 		return

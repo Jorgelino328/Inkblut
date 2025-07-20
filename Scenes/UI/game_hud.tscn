@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://bvg8d4k5r0m1k"]
+[gd_scene load_steps=3 format=3 uid="uid://bslej8clt4cyx"]
 
 [ext_resource type="Theme" uid="uid://dyswh45trxwxj" path="res://Assets/Themes/inkblut_classic.tres" id="1_theme"]
 [ext_resource type="Script" path="res://Scenes/UI/game_hud.gd" id="2_script"]
@@ -30,12 +30,18 @@ size_flags_horizontal = 3
 
 [node name="TimerLabel" type="Label" parent="TopContainer/TimerContainer"]
 layout_mode = 2
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_constants/shadow_outline_size = 1
 theme_override_font_sizes/font_size = 32
 text = "3:00"
 horizontal_alignment = 1
 
 [node name="TimerSubLabel" type="Label" parent="TopContainer/TimerContainer"]
 layout_mode = 2
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_constants/shadow_outline_size = 1
 theme_override_font_sizes/font_size = 16
 text = "MATCH TIME"
 horizontal_alignment = 1
@@ -46,12 +52,18 @@ size_flags_horizontal = 3
 
 [node name="CoverageLabel" type="Label" parent="TopContainer/CoverageContainer"]
 layout_mode = 2
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_constants/shadow_outline_size = 1
 theme_override_font_sizes/font_size = 24
 text = "Coverage: 45.2%"
 horizontal_alignment = 1
 
 [node name="CoverageSubLabel" type="Label" parent="TopContainer/CoverageContainer"]
 layout_mode = 2
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_constants/shadow_outline_size = 1
 theme_override_font_sizes/font_size = 16
 text = "YOUR TERRITORY"
 horizontal_alignment = 1
@@ -75,6 +87,9 @@ size_flags_horizontal = 0
 
 [node name="HealthLabel" type="Label" parent="BottomContainer/HealthContainer"]
 layout_mode = 2
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_constants/shadow_outline_size = 1
 theme_override_font_sizes/font_size = 20
 text = "HP: 3/3"
 
@@ -92,20 +107,9 @@ alignment = 1
 
 [node name="RespawnLabel" type="Label" parent="BottomContainer/RespawnContainer"]
 layout_mode = 2
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_constants/shadow_outline_size = 1
 theme_override_font_sizes/font_size = 24
 text = "RESPAWNING IN 8s"
 horizontal_alignment = 1
-
-[node name="MinimapContainer" type="VBoxContainer" parent="BottomContainer"]
-layout_mode = 2
-size_flags_horizontal = 0
-
-[node name="MinimapLabel" type="Label" parent="BottomContainer/MinimapContainer"]
-layout_mode = 2
-text = "MINIMAP"
-horizontal_alignment = 1
-
-[node name="MinimapPlaceholder" type="ColorRect" parent="BottomContainer/MinimapContainer"]
-custom_minimum_size = Vector2(150, 100)
-layout_mode = 2
-color = Color(0.2, 0.2, 0.3, 0.8)

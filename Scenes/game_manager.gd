@@ -379,14 +379,16 @@ func handle_player_death(player_id: int):
 		
 	print("Player ", player_id, " died")
 	
-	# Remove player's tank from scene
-	if player_id in players and players[player_id].tank_node:
-		var tank = players[player_id].tank_node
-		tank.queue_free()
-		players[player_id].tank_node = null
+	# Mark player data as dead (don't delete the tank - tank.die() already handles hiding)
+	if player_id in players:
+		players[player_id].is_alive = false
+		players[player_id].health = 0
+		# Tank is already hidden by tank.die() - don't delete it
 	
-	# Start respawn timer
-	dead_players[player_id] = respawn_delay
+	# Start respawn timer (will be synced to all clients)
+	if is_host:
+		dead_players[player_id] = respawn_delay
+	
 	player_died.emit(player_id)
 	
 	if is_host:
@@ -395,29 +397,62 @@ func handle_player_death(player_id: int):
 @rpc("authority", "reliable", "call_local")
 func _sync_player_death(player_id: int):
 	"""Sync player death to all clients"""
+	print("_sync_player_death called for player: ", player_id)
+	
+	# Add to dead players list on all clients
+	dead_players[player_id] = respawn_delay
+	
 	player_died.emit(player_id)
 
 @rpc("authority", "reliable", "call_local")
 func _sync_player_respawn(player_id: int):
 	"""Sync player respawn to all clients"""
+	print("_sync_player_respawn called for player: ", player_id)
+	
+	# Remove from dead players list on all clients
+	if player_id in dead_players:
+		dead_players.erase(player_id)
+	
+	# Find and respawn the tank on all clients
+	if player_id in players and players[player_id].tank_node:
+		var tank = players[player_id].tank_node
+		if is_instance_valid(tank):
+			# Move tank to new spawn position
+			var spawn_pos = _get_spawn_position(players[player_id].team)
+			tank.global_position = spawn_pos
+			players[player_id].spawn_position = spawn_pos
+			
+			# Call tank's respawn method
+			tank.respawn()
+			players[player_id].is_alive = true
+			players[player_id].health = tank.max_hp
+			
+			print("Tank respawned on client for player: ", player_id)
+		else:
+			print("Invalid tank reference for player: ", player_id)
+	else:
+		print("No tank found for player: ", player_id)
+	
 	player_respawned.emit(player_id)
 
 func _process(delta):
 	"""Update respawn timers"""
-	if not is_host:
-		return
-		
-	# Update respawn timers for dead players
+	# Update respawn timers for dead players (for UI display)
 	var players_to_respawn = []
 	
 	for player_id in dead_players:
 		dead_players[player_id] -= delta
 		if dead_players[player_id] <= 0:
-			players_to_respawn.append(player_id)
+			if is_host:
+				players_to_respawn.append(player_id)
+			else:
+				# On clients, just clamp to 0 for UI display
+				dead_players[player_id] = 0.0
 	
-	# Respawn players whose timer expired
-	for player_id in players_to_respawn:
-		_respawn_player(player_id)
+	# Only host actually triggers respawns
+	if is_host:
+		for player_id in players_to_respawn:
+			_respawn_player(player_id)
 
 func _respawn_player(player_id: int):
 	"""Respawn a dead player"""
@@ -433,9 +468,28 @@ func _respawn_player(player_id: int):
 	# Remove from dead players
 	dead_players.erase(player_id)
 	
-	# Spawn new tank
-	print("Calling spawn_player.rpc for respawn: ", player_id)
-	spawn_player.rpc(player_id)
+	# Try to respawn existing tank first
+	var player_data = players[player_id]
+	if player_data.tank_node and is_instance_valid(player_data.tank_node):
+		# Respawn existing tank
+		print("Respawning existing tank for player: ", player_id)
+		var tank = player_data.tank_node
+		
+		# Move tank to new spawn position
+		var spawn_pos = _get_spawn_position(player_data.team)
+		tank.global_position = spawn_pos
+		player_data.spawn_position = spawn_pos
+		
+		# Call tank's respawn method
+		tank.respawn()
+		player_data.is_alive = true
+		player_data.health = tank.max_hp
+		
+		print("Existing tank respawned for player ", player_id, " at position ", spawn_pos)
+	else:
+		# Tank doesn't exist or is invalid, create new one
+		print("Creating new tank for respawn: ", player_id)
+		spawn_player.rpc(player_id)
 	
 	player_respawned.emit(player_id)
 	_sync_player_respawn.rpc(player_id)

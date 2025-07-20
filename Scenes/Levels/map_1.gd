@@ -34,7 +34,7 @@ func _on_game_ended(winner_data):
 	if game_hud:
 		game_hud.hide()
 	if game_results:
-		game_results.show_results(winner_data)
+			game_results.show_results(winner_data)
 
 func _on_game_timer_updated(time_left: float):
 	"""Update the timer display"""

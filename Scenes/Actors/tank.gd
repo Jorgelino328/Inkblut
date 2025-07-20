@@ -21,6 +21,10 @@ var network_cannon_rotation: float
 var network_body_flip: bool
 var network_animation: String = "Idle"
 var is_dead: bool = false
+var damage_cooldown: float = 0.0
+var damage_cooldown_time: float = 0.1  # 100ms cooldown between damage instances
+var hit_flash_timer: float = 0.0
+var hit_flash_duration: float = 0.2  # 200ms flash duration
 
 func _ready():
 	# Add to tanks group for discovery
@@ -32,6 +36,9 @@ func _ready():
 	# Initialize health
 	current_hp = max_hp
 	
+	# Ensure tank starts with full opacity
+	modulate.a = 1.0
+	
 	# Initialize network variables
 	network_position = global_position
 	network_velocity = velocity
@@ -39,6 +46,22 @@ func _ready():
 	network_body_flip = $Body.flip_h
 
 func _physics_process(delta):
+	# Update damage cooldown
+	if damage_cooldown > 0:
+		damage_cooldown -= delta
+		
+	# Handle hit flash effect
+	if hit_flash_timer > 0:
+		hit_flash_timer -= delta
+		# Flash between transparent and opaque
+		var flash_alpha = sin(hit_flash_timer * 20) * 0.5 + 0.5  # Oscillates between 0.0 and 1.0
+		modulate.a = max(0.3, flash_alpha)  # Don't go completely transparent
+		
+		if hit_flash_timer <= 0:
+			# Flash finished, return to full opacity
+			modulate.a = 1.0
+			print("Hit flash finished for player: ", player_id)
+		
 	if is_dead:
 		return  # Don't process physics if dead
 		
@@ -147,16 +170,29 @@ func _on_animation_finished(anim_name):
 func _on_hit(body):
 	if is_dead:
 		return  # Already dead
-		
-	take_damage(1)
+	
+	# Inkshots handle their own collision and call take_damage.rpc() directly
+	# This hitbox might be for other damage sources in the future
+	# For now, disable to prevent spawn damage issues
+	# TODO: Define what should actually trigger damage through this hitbox
+	pass
 
 @rpc("any_peer", "reliable", "call_local")
 func take_damage(damage: int):
 	if is_dead:
 		return
 		
+	# Prevent double damage with cooldown
+	if damage_cooldown > 0:
+		print("Damage blocked by cooldown for player: ", player_id)
+		return
+		
+	damage_cooldown = damage_cooldown_time
+	
 	current_hp -= damage
-	anim.play("Hit")
+	# Use custom flash effect instead of animation to avoid transparency issues
+	hit_flash_timer = hit_flash_duration
+	print("Starting hit flash for player: ", player_id)
 	
 	# Emit health_changed signal
 	emit_signal("health_changed", current_hp, max_hp)
@@ -192,6 +228,11 @@ func respawn():
 	is_dead = false
 	current_hp = max_hp
 	visible = true
+	damage_cooldown = 0.0  # Reset damage cooldown
+	hit_flash_timer = 0.0  # Reset flash timer
+	
+	# Ensure tank has full opacity on respawn
+	modulate.a = 1.0
 	
 	# Re-enable physics and input
 	set_physics_process(true)
@@ -207,5 +248,7 @@ func _on_hit_floor(body):
 
 func set_tank_color(color: Color):
 	"""Set the tank's color"""
+	# Preserve alpha channel when setting color to avoid transparency issues
+	color.a = 1.0
 	modulate = color
 	print("Tank ", player_id, " color set to: ", color)
