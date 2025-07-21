@@ -38,7 +38,7 @@ func _on_find_game_pressed():
 	if scene_controller:
 		scene_controller.change_scene("global_lobby")
 	else:
-		print("ERROR: SceneController not found")
+		print("ERROR: Scene controller not found")
 
 func _on_host_game_pressed():
 	print("Host Game pressed - going to custom match...")

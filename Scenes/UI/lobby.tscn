@@ -54,9 +54,9 @@ horizontal_alignment = 1
 
 [node name="PlayerListContainer" type="VBoxContainer" parent="."]
 layout_mode = 0
-offset_left = 200.0
+offset_left = 50.0
 offset_top = 240.0
-offset_right = 1024.0
+offset_right = 450.0
 offset_bottom = 480.0
 theme = ExtResource("2_lobby_theme")
 
@@ -73,6 +73,55 @@ theme_override_constants/separation = 10
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "1. Host (You)"
+
+[node name="ChatContainer" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 500.0
+offset_top = 240.0
+offset_right = 1150.0
+offset_bottom = 480.0
+theme = ExtResource("2_lobby_theme")
+
+[node name="Panel" type="Panel" parent="ChatContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ChatLabel" type="Label" parent="ChatContainer/Panel"]
+layout_mode = 2
+offset_left = 20.0
+offset_top = 4.0
+offset_right = 650.0
+offset_bottom = 43.0
+theme_override_font_sizes/font_size = 32
+text = "Lobby Chat:"
+
+[node name="ChatHistory" type="RichTextLabel" parent="ChatContainer/Panel"]
+layout_mode = 2
+offset_left = 20.0
+offset_top = 47.0
+offset_right = 650.0
+offset_bottom = 199.0
+size_flags_vertical = 3
+bbcode_enabled = true
+text = "[color=gray]Welcome to the lobby! Chat with other players while waiting...[/color]"
+scroll_following = true
+
+[node name="ChatInputContainer" type="HBoxContainer" parent="ChatContainer/Panel"]
+layout_mode = 2
+offset_left = 12.0
+offset_top = 199.0
+offset_right = 644.0
+offset_bottom = 236.0
+theme_override_constants/separation = 10
+
+[node name="MessageInput" type="LineEdit" parent="ChatContainer/Panel/ChatInputContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Type a message..."
+
+[node name="SendButton" type="Button" parent="ChatContainer/Panel/ChatInputContainer"]
+layout_mode = 2
+text = "Send"
 
 [node name="ButtonContainer" type="HBoxContainer" parent="."]
 layout_mode = 0

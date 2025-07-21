@@ -454,66 +454,74 @@ func _send_scene_info_to_new_client(client_id: int):
 			print("Sending client to lobby")
 			_notify_client_scene.rpc_id(client_id, "lobby")
 
-# Utility functions
-func get_server_info() -> Dictionary:
-	# Update current player count dynamically
-	if is_server and server_info.size() > 0:
-		server_info.current_players = 1 + multiplayer.get_peers().size()
-	return server_info
+# === LOBBY CHAT FUNCTIONS ===
 
-func get_available_servers() -> Array[Dictionary]:
-	return available_servers
-
-func is_hosting() -> bool:
-	return is_server
-
-# Quick play functionality - joins a random available server
-func quick_play() -> void:
-	print("Starting quick play...")
-	# Connect to server list updated signal if not already connected
-	if not server_list_updated.is_connected(_on_quick_play_server_list_updated):
-		server_list_updated.connect(_on_quick_play_server_list_updated)
+func send_lobby_chat(username: String, message: String):
+	"""Send a lobby chat message to all connected clients"""
+	print("NetworkManager: Sending lobby chat from ", username, ": ", message)
+	print("Is server: ", is_server)
+	print("Connected peers: ", multiplayer.get_peers())
 	
-	# Start server discovery
-	start_server_discovery()
+	if is_server:
+		# If we're the server, broadcast to all clients (including ourselves)
+		print("Broadcasting lobby chat as server")
+		_relay_lobby_chat.rpc(username, message)
+	else:
+		# If we're a client, send to server to relay
+		print("Sending lobby chat to server for relay")
+		_send_lobby_chat_to_server.rpc_id(1, username, message)
 
-func _on_quick_play_server_list_updated(servers: Array):
-	# Disconnect the signal to avoid multiple calls
-	if server_list_updated.is_connected(_on_quick_play_server_list_updated):
-		server_list_updated.disconnect(_on_quick_play_server_list_updated)
+@rpc("authority", "call_local", "reliable")
+func _relay_lobby_chat(username: String, message: String):
+	"""Relay lobby chat message to all clients (called by server)"""
+	print("=== NetworkManager: RELAY LOBBY CHAT ===")
+	print("From: ", username)
+	print("Message: ", message)
+	print("My ID: ", multiplayer.get_unique_id())
+	print("Is server: ", is_server)
+	print("Looking for lobby scene...")
 	
-	# Filter for servers with available slots
-	var joinable_servers = servers.filter(func(server): 
-		var current_players = server.get("current_players", 0)
-		var max_players = server.get("max_players", 10)
-		return current_players < max_players
-	)
+	# Find the lobby scene and send the message to it
+	var lobby_scene = get_tree().get_first_node_in_group("lobby_scene")
+	print("Found lobby scene by group: ", lobby_scene)
 	
-	if joinable_servers.is_empty():
-		print("No available servers found for quick play")
-		# Could emit a signal here to show "No servers available" message
-		return
+	if not lobby_scene:
+		# Try to find the lobby scene by scanning current scene
+		var scene_controller = get_tree().get_first_node_in_group("scene_controller")
+		print("Found scene controller: ", scene_controller)
+		if scene_controller and scene_controller.current_scene_name == "lobby":
+			lobby_scene = scene_controller.current_scene
+			print("Found lobby scene via scene controller: ", lobby_scene)
 	
-	# Pick a random server
-	var random_server = joinable_servers[randi() % joinable_servers.size()]
-	print("Quick play joining server: ", random_server.get("name", "Unknown"))
+	if not lobby_scene:
+		# Try to find it by scanning all nodes in the current scene
+		var current_scene = get_tree().current_scene
+		print("Scanning current scene for lobby: ", current_scene)
+		if current_scene and current_scene.name.to_lower().contains("lobby"):
+			lobby_scene = current_scene
+			print("Found lobby scene by name: ", lobby_scene)
 	
-	# Connect to the server
-	var success = connect_to_server("127.0.0.1", random_server.get("port", DEFAULT_PORT))
-	if not success:
-		print("Failed to initiate quick play connection")
+	if lobby_scene and lobby_scene.has_method("_add_lobby_chat_message"):
+		print("SUCCESS: Calling _add_lobby_chat_message on lobby scene")
+		lobby_scene._add_lobby_chat_message(username, message)
+	else:
+		print("ERROR: Could not find lobby scene to relay chat message")
+		print("Available groups: ", get_tree().get_nodes_in_group("lobby_scene"))
+		print("Current scene: ", get_tree().current_scene)
+		print("Current scene name: ", get_tree().current_scene.name if get_tree().current_scene else "None")
 
-func set_server_status(status: String):
-	"""Update the server status (waiting, active, ended)"""
-	if is_server and server_info.size() > 0:
-		server_info.status = status
-		print("Server status updated to: ", status)
-		server_info_updated.emit()
-
-func mark_game_started():
-	"""Mark the game as started/active"""
-	set_server_status("active")
-
-func mark_game_ended():
-	"""Mark the game as ended"""
-	set_server_status("ended")
+@rpc("any_peer", "call_remote", "reliable")
+func _send_lobby_chat_to_server(username: String, message: String):
+	"""Send lobby chat message to server (called by clients)"""
+	print("=== NetworkManager: RECEIVE LOBBY CHAT FROM CLIENT ===")
+	print("From client: ", username)
+	print("Message: ", message)
+	print("Sender ID: ", multiplayer.get_remote_sender_id())
+	print("Is server: ", is_server)
+	
+	if is_server:
+		# Relay to all clients (including the server itself)
+		print("Relaying message to all clients")
+		_relay_lobby_chat.rpc(username, message)
+	else:
+		print("ERROR: Non-server received _send_lobby_chat_to_server")

@@ -130,66 +130,6 @@ size_flags_horizontal = 3
 layout_mode = 2
 text = "Create New Match"
 
-[node name="ChatPanel" type="Panel" parent="HSplitContainer"]
-custom_minimum_size = Vector2(300, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="VBoxContainer2" type="VBoxContainer" parent="HSplitContainer/ChatPanel"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="ChatTitleContainer" type="HBoxContainer" parent="HSplitContainer/ChatPanel/VBoxContainer2"]
-layout_mode = 2
-
-[node name="ChatTitleLabel" type="Label" parent="HSplitContainer/ChatPanel/VBoxContainer2/ChatTitleContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 18
-text = "Global Chat"
-vertical_alignment = 1
-
-[node name="OnlineCountLabel" type="Label" parent="HSplitContainer/ChatPanel/VBoxContainer2/ChatTitleContainer"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "0 users online"
-vertical_alignment = 1
-
-[node name="HSeparator2" type="HSeparator" parent="HSplitContainer/ChatPanel/VBoxContainer2"]
-layout_mode = 2
-
-[node name="ChatContainer" type="ScrollContainer" parent="HSplitContainer/ChatPanel/VBoxContainer2"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="ChatHistory" type="RichTextLabel" parent="HSplitContainer/ChatPanel/VBoxContainer2/ChatContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-bbcode_enabled = true
-text = "Welcome to Inkblut! Chat with other players here."
-scroll_following = true
-
-[node name="MessageContainer" type="HBoxContainer" parent="HSplitContainer/ChatPanel/VBoxContainer2"]
-layout_mode = 2
-
-[node name="MessageInput" type="LineEdit" parent="HSplitContainer/ChatPanel/VBoxContainer2/MessageContainer"]
-layout_mode = 2
-size_flags_horizontal = 3
-placeholder_text = "Type your message here..."
-
-[node name="SendButton" type="Button" parent="HSplitContainer/ChatPanel/VBoxContainer2/MessageContainer"]
-layout_mode = 2
-text = " Send "
-
 [node name="CreateMatchDialog" type="AcceptDialog" parent="."]
 title = "Create New Match"
 initial_position = 1

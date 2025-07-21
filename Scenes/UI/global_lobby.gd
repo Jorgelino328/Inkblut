@@ -2,10 +2,7 @@ extends Control
 
 # UI References
 @onready var match_list: VBoxContainer = $HSplitContainer/MatchListPanel/VBoxContainer/MatchListContainer/MatchList
-@onready var chat_history: RichTextLabel = $HSplitContainer/ChatPanel/VBoxContainer2/ChatContainer/ChatHistory
-@onready var message_input: LineEdit = $HSplitContainer/ChatPanel/VBoxContainer2/MessageContainer/MessageInput
-@onready var send_button: Button = $HSplitContainer/ChatPanel/VBoxContainer2/MessageContainer/SendButton
-@onready var online_count_label: Label = $HSplitContainer/ChatPanel/VBoxContainer2/ChatTitleContainer/OnlineCountLabel
+@onready var online_count_label: Label = $HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer/OnlineCountLabel
 @onready var logout_button: Button = $HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer/LogoutButton
 @onready var back_button: Button = $HSplitContainer/MatchListPanel/VBoxContainer/HeaderContainer/BackButton
 @onready var refresh_button: Button = $HSplitContainer/MatchListPanel/VBoxContainer/FilterContainer/RefreshButton
@@ -65,9 +62,6 @@ func _ready():
 	# Connect signals
 	_connect_signals()
 	
-	# Join the global lobby
-	lobby_manager.join_lobby(current_user.username)
-	
 	# Start server discovery to find available servers
 	if network_manager:
 		print("Starting server discovery...")
@@ -78,42 +72,45 @@ func _ready():
 	
 	# Initial updates
 	_update_matches()
-	_update_chat()
 	_update_online_count()
 
 func _connect_signals():
-	# UI signals
-	back_button.pressed.connect(_on_back_pressed)
-	logout_button.pressed.connect(_on_logout_pressed)
-	refresh_button.pressed.connect(_on_refresh_pressed)
-	create_match_button.pressed.connect(_on_create_match_pressed)
-	send_button.pressed.connect(_on_send_message)
-	message_input.text_submitted.connect(_on_message_submitted)
-	game_mode_filter.item_selected.connect(_on_filter_changed)
-	status_filter.item_selected.connect(_on_filter_changed)
+	# UI signals - with null checks
+	if back_button:
+		back_button.pressed.connect(_on_back_pressed)
+	if logout_button:
+		logout_button.pressed.connect(_on_logout_pressed)
+	if refresh_button:
+		refresh_button.pressed.connect(_on_refresh_pressed)
+	if create_match_button:
+		create_match_button.pressed.connect(_on_create_match_pressed)
+	if game_mode_filter:
+		game_mode_filter.item_selected.connect(_on_filter_changed)
+	if status_filter:
+		status_filter.item_selected.connect(_on_filter_changed)
 	
 	# Search functionality
 	if search_field:
 		search_field.text_changed.connect(_on_search_text_changed)
 	
 	# Create match dialog signals
-	cancel_button.pressed.connect(_on_cancel_create_match)
-	create_button.pressed.connect(_on_confirm_create_match)
+	if cancel_button:
+		cancel_button.pressed.connect(_on_cancel_create_match)
+	if create_button:
+		create_button.pressed.connect(_on_confirm_create_match)
 	
 	# LobbyManager signals
-	lobby_manager.user_joined_lobby.connect(_on_user_joined_lobby)
-	lobby_manager.user_left_lobby.connect(_on_user_left_lobby)
-	lobby_manager.lobby_chat_message.connect(_on_chat_message_received)
-	lobby_manager.match_created.connect(_on_match_created)
-	lobby_manager.match_started.connect(_on_match_updated)
-	lobby_manager.match_ended.connect(_on_match_ended)
+	if lobby_manager:
+		lobby_manager.match_created.connect(_on_match_created)
+		lobby_manager.match_started.connect(_on_match_updated)
+		lobby_manager.match_ended.connect(_on_match_ended)
 
 func _update_matches():
 	print("=== Updating matches display ===")
 	
 	# Get available servers from NetworkManager (the working system)
 	if network_manager:
-		all_servers = network_manager.get_available_servers()
+		all_servers = network_manager.available_servers
 		print("Available servers from NetworkManager: ", all_servers.size())
 		for server in all_servers:
 			print("  - Server: ", server.get("name", "Unknown"), " | IP: ", server.get("ip", "Unknown"), ":", server.get("port", 0))
@@ -298,29 +295,12 @@ func _on_filter_changed(index: int = 0):
 	"""Apply filters when any filter option changes"""
 	_apply_filters()
 
-func _update_chat():
-	var messages = lobby_manager.get_chat_history()
-	chat_history.clear()
-	
-	for message in messages:
-		var timestamp = message.get("timestamp", "")
-		var username = message.get("username", "Unknown")
-		var text = message.get("message", "")
-		
-		chat_history.append_text("[%s] [color=cyan]%s[/color]: %s\n" % [timestamp, username, text])
-	
-	# Auto-scroll to bottom to show latest messages
-	call_deferred("_scroll_chat_to_bottom")
-
-func _scroll_chat_to_bottom():
-	"""Scroll chat to the bottom to show latest messages"""
-	if chat_history:
-		chat_history.scroll_to_line(chat_history.get_line_count())
-
 func _update_online_count():
-	var users = lobby_manager.get_lobby_users()
-	var count = users.size()
-	online_count_label.text = "%d users online" % count
+	# For now, just show a static count since we don't have global lobby users
+	if online_count_label:
+		online_count_label.text = "Global Lobby"
+	else:
+		print("WARNING: online_count_label node not found")
 
 func _on_logout_pressed():
 	print("Logging out user: ", current_user.username)
@@ -339,7 +319,6 @@ func _on_refresh_pressed():
 	if network_manager:
 		network_manager.start_server_discovery()
 	_update_matches()
-	_update_chat()
 	_update_online_count()
 
 func _on_create_match_pressed():
@@ -360,12 +339,8 @@ func _on_back_pressed():
 
 func _cleanup_lobby():
 	"""Clean up when leaving the lobby"""
-	if current_user and lobby_manager:
-		lobby_manager.leave_lobby(current_user.username)
-	
-	# Stop server discovery if active
-	if network_manager:
-		network_manager.stop_server_discovery()
+	# No cleanup needed since we removed global lobby functionality
+	pass
 
 func _on_cancel_create_match():
 	create_match_dialog.hide()
@@ -393,43 +368,7 @@ func _on_confirm_create_match():
 	else:
 		show_message("Failed to create match: " + result.get("message", "Unknown error"))
 
-func _on_send_message():
-	_send_chat_message()
-
-func _on_message_submitted(text: String):
-	_send_chat_message()
-
-func _send_chat_message():
-	var message = message_input.text.strip_edges()
-	if message.is_empty():
-		return
-	
-	print("Sending chat message: ", message)
-	
-	# Send message via lobby manager (which will handle networking)
-	if current_user and lobby_manager:
-		lobby_manager.send_chat_message(current_user.username, message)
-	
-	message_input.text = ""
-	message_input.grab_focus()
-
 # LobbyManager signal handlers
-func _on_user_joined_lobby(username: String):
-	print("User joined lobby: ", username)
-	_update_online_count()
-	_update_chat()  # Refresh to see join message if any
-
-func _on_user_left_lobby(username: String):
-	print("User left lobby: ", username)
-	_update_online_count()
-
-func _on_chat_message_received(username: String, message: String):
-	print("Chat message received from ", username, ": ", message)
-	# Add the message to the UI immediately 
-	var timestamp = Time.get_datetime_string_from_system()
-	chat_history.append_text("[%s] [color=cyan]%s[/color]: %s\n" % [timestamp, username, message])
-	call_deferred("_scroll_chat_to_bottom")
-
 func _on_match_created(match_data: Dictionary):
 	print("Match created: ", match_data)
 	_update_matches()
@@ -444,11 +383,7 @@ func _on_match_ended(match_id: String):
 
 func show_message(text: String):
 	print("Global Lobby: ", text)
-	# Show message in chat as system message
-	if chat_history:
-		var timestamp = Time.get_datetime_string_from_system()
-		chat_history.append_text("[%s] [color=yellow][SYSTEM][/color]: %s\n" % [timestamp, text])
-		call_deferred("_scroll_chat_to_bottom")
+	# TODO: Show message in a proper notification system instead of chat
 
 func _go_to_login():
 	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
@@ -456,9 +391,8 @@ func _go_to_login():
 		scene_controller.change_scene("login")
 
 func _input(event):
-	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_ENTER and message_input.has_focus():
-			_send_chat_message()
+	# Chat input handling removed - no chat in global lobby
+	pass
 
 func _on_server_list_updated(servers: Array):
 	"""Called when NetworkManager updates the server list"""
@@ -466,6 +400,7 @@ func _on_server_list_updated(servers: Array):
 	_update_matches()
 
 func _exit_tree():
-	"""Called when the scene is being destroyed - ensure proper cleanup"""
-	print("Global lobby exiting, cleaning up...")
-	_cleanup_lobby()
+	"""Clean up when leaving the global lobby"""
+	print("=== GLOBAL LOBBY: CLEANING UP ===")
+	if lobby_manager and current_user:
+		print("User leaving lobby: ", current_user.username)

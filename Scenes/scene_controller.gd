@@ -11,8 +11,8 @@ var current_scene_name: String = ""
 const UI_SCENES = {
 	"login": "res://Scenes/UI/login.tscn",
 	"main_menu": "res://Scenes/UI/main_menu.tscn",
-	"global_lobby": "res://Scenes/UI/global_lobby.tscn",
 	"mode_select": "res://Scenes/UI/mode_select.tscn",
+	"global_lobby": "res://Scenes/UI/global_lobby.tscn",
 	"custom_match": "res://Scenes/UI/custom_match.tscn",
 	"lobby": "res://Scenes/UI/lobby.tscn",
 	"game_over": "res://Scenes/UI/game_over.tscn"
