@@ -193,18 +193,48 @@ func _create_server_button(server_info: Dictionary):
 	# Create main server button
 	var button = Button.new()
 	
+	# Get server status
+	var status = server_info.get("status", "active")
+	var current_players = server_info.get("current_players", 0)
+	var max_players = server_info.get("max_players", 4)
+	var is_full = current_players >= max_players
+	var is_ended = status == "ended" or status == "finished"
+	
+	# Format button text with status indicators
+	var status_text = ""
+	if is_ended:
+		status_text = " [ENDED]"
+	elif is_full:
+		status_text = " [FULL]"
+	elif current_players > 0:
+		status_text = " [ACTIVE]"
+	else:
+		status_text = " [WAITING]"
+	
 	# Format button text like find_game.gd
-	var button_text = "%s - %s - %s - %d/%d" % [
+	var button_text = "%s - %s - %s - %d/%d%s" % [
 		server_info.get("name", "Unknown Server"),
 		server_info.get("game_mode", "Unknown Mode"),
 		server_info.get("map", "Unknown Map"),
-		server_info.get("current_players", 0),
-		server_info.get("max_players", 4)
+		current_players,
+		max_players,
+		status_text
 	]
 	
 	button.text = button_text
 	button.pressed.connect(_on_server_selected.bind(server_info))
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	
+	# Change button appearance based on status
+	if is_ended:
+		button.modulate = Color.GRAY
+		button.disabled = false  # Keep clickable for error message
+	elif is_full:
+		button.modulate = Color.ORANGE
+		button.disabled = false  # Keep clickable for error message
+	else:
+		button.modulate = Color.WHITE
+		button.disabled = false
 	
 	# Add button to server list
 	match_list.add_child(button)
@@ -216,6 +246,21 @@ func _on_server_selected(server_info: Dictionary):
 	print("Server name: ", server_info.get("name"))
 	print("Server port: ", server_info.get("port"))
 	print("Server info: ", server_info)
+	
+	# Check if match has ended
+	var match_status = server_info.get("status", "unknown")
+	if match_status == "ended" or match_status == "finished":
+		show_message("Cannot join: This match has already ended")
+		print("Attempted to join ended match")
+		return
+	
+	# Check if match is full
+	var current_players = server_info.get("current_players", 0)
+	var max_players = server_info.get("max_players", 4)
+	if current_players >= max_players:
+		show_message("Cannot join: This match is full")
+		print("Attempted to join full match")
+		return
 	
 	if network_manager:
 		# Connect to network manager signals for connection
@@ -263,6 +308,14 @@ func _update_chat():
 		var text = message.get("message", "")
 		
 		chat_history.append_text("[%s] [color=cyan]%s[/color]: %s\n" % [timestamp, username, text])
+	
+	# Auto-scroll to bottom to show latest messages
+	call_deferred("_scroll_chat_to_bottom")
+
+func _scroll_chat_to_bottom():
+	"""Scroll chat to the bottom to show latest messages"""
+	if chat_history:
+		chat_history.scroll_to_line(chat_history.get_line_count())
 
 func _update_online_count():
 	var users = lobby_manager.get_lobby_users()
@@ -272,8 +325,8 @@ func _update_online_count():
 func _on_logout_pressed():
 	print("Logging out user: ", current_user.username)
 	
-	# Leave lobby
-	lobby_manager.leave_lobby(current_user.username)
+	# Clean up lobby networking and state
+	_cleanup_lobby()
 	
 	# Logout from user manager
 	user_manager.logout_user()
@@ -300,9 +353,19 @@ func _on_create_match_pressed():
 func _on_back_pressed():
 	print("=== BACK BUTTON PRESSED ===")
 	print("Going back to main menu...")
+	_cleanup_lobby()
 	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
 	if scene_controller:
 		scene_controller.change_scene("main_menu")
+
+func _cleanup_lobby():
+	"""Clean up when leaving the lobby"""
+	if current_user and lobby_manager:
+		lobby_manager.leave_lobby(current_user.username)
+	
+	# Stop server discovery if active
+	if network_manager:
+		network_manager.stop_server_discovery()
 
 func _on_cancel_create_match():
 	create_match_dialog.hide()
@@ -342,7 +405,11 @@ func _send_chat_message():
 		return
 	
 	print("Sending chat message: ", message)
-	lobby_manager.send_chat_message(current_user.username, message)
+	
+	# Send message via lobby manager (which will handle networking)
+	if current_user and lobby_manager:
+		lobby_manager.send_chat_message(current_user.username, message)
+	
 	message_input.text = ""
 	message_input.grab_focus()
 
@@ -357,8 +424,11 @@ func _on_user_left_lobby(username: String):
 	_update_online_count()
 
 func _on_chat_message_received(username: String, message: String):
-	print("Chat message from ", username, ": ", message)
-	_update_chat()
+	print("Chat message received from ", username, ": ", message)
+	# Add the message to the UI immediately 
+	var timestamp = Time.get_datetime_string_from_system()
+	chat_history.append_text("[%s] [color=cyan]%s[/color]: %s\n" % [timestamp, username, message])
+	call_deferred("_scroll_chat_to_bottom")
 
 func _on_match_created(match_data: Dictionary):
 	print("Match created: ", match_data)
@@ -374,7 +444,11 @@ func _on_match_ended(match_id: String):
 
 func show_message(text: String):
 	print("Global Lobby: ", text)
-	# In a real implementation, you might want to show this in a popup or status bar
+	# Show message in chat as system message
+	if chat_history:
+		var timestamp = Time.get_datetime_string_from_system()
+		chat_history.append_text("[%s] [color=yellow][SYSTEM][/color]: %s\n" % [timestamp, text])
+		call_deferred("_scroll_chat_to_bottom")
 
 func _go_to_login():
 	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
@@ -390,3 +464,8 @@ func _on_server_list_updated(servers: Array):
 	"""Called when NetworkManager updates the server list"""
 	print("=== Server list updated! Found ", servers.size(), " servers ===")
 	_update_matches()
+
+func _exit_tree():
+	"""Called when the scene is being destroyed - ensure proper cleanup"""
+	print("Global lobby exiting, cleaning up...")
+	_cleanup_lobby()

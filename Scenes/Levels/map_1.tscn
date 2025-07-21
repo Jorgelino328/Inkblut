@@ -93,6 +93,7 @@ position = Vector2(200, -114)
 shape = SubResource("RectangleShape2D_6")
 
 [node name="GameManager" parent="." instance=ExtResource("3_game_manager")]
+game_duration = 10.0
 
 [node name="UI" type="CanvasLayer" parent="."]
 

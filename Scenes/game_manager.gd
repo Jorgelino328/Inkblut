@@ -26,9 +26,12 @@ var game_mode: String = "FREE-FOR-ALL"
 var is_host: bool = false
 var tank_scene = preload("res://Scenes/Actors/tank.tscn")
 
+# Manager references
+var network_manager: NetworkManager
+
 # Game state variables
 var game_active: bool = false
-var game_duration: float = 180.0  # 3 minutes default
+@export var game_duration: float = 180.0  # 3 minutes default - can be adjusted in editor
 var time_remaining: float = 0.0
 var game_timer: Timer
 var coverage_update_timer: Timer
@@ -47,6 +50,11 @@ func _ready():
 	print("Available methods include: set_game_mode, start_game, spawn_player")
 	# Add to group for easy access
 	add_to_group("game_manager")
+	
+	# Get network manager reference
+	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
+	if scene_controller:
+		network_manager = scene_controller.network_manager
 	
 	# Collect spawn areas from the current scene
 	_collect_spawn_areas()
@@ -90,7 +98,8 @@ func _collect_spawn_areas():
 	spawn_areas.clear()
 	
 	# Look for SpawnAreas node or any Area2D nodes with "spawn" in their name
-	var scene_root = get_tree().current_scene
+	# Use the GameManager's parent (the actual game scene) as the root
+	var scene_root = get_parent()
 	var spawn_areas_node = scene_root.find_child("SpawnAreas", true, false)
 	
 	if spawn_areas_node:
@@ -166,6 +175,10 @@ func start_game():
 	
 	# Start the game timer
 	start_game_timer(game_duration)
+	
+	# Mark game as started in network manager
+	if network_manager:
+		network_manager.mark_game_started()
 	
 	game_started.emit()
 
@@ -531,8 +544,9 @@ func spawn_player(player_id: int):
 	tank_instance.set_tank_color(player_data.color)
 	print("Set tank ", player_id, " color to: ", player_data.color)
 	
-	# Add tank to scene
-	get_tree().current_scene.add_child(tank_instance)
+	# Add tank to scene - use the current game scene, not the root scene
+	# The GameManager is a child of the actual game scene (map_1, map_2, etc.)
+	get_parent().add_child(tank_instance)
 	
 	# Update player spawn position
 	player_data.spawn_position = spawn_pos
@@ -585,15 +599,29 @@ func _end_game():
 	
 	print("Game ended. Winner: ", winner_data)
 	
+	# Mark game as ended in network manager
+	if network_manager:
+		network_manager.mark_game_ended()
+	
 	# Broadcast game end
 	_sync_game_end.rpc(final_results, winner_data)
-	game_ended.emit(winner_data)
+	game_ended.emit({
+		"winner": winner_data,
+		"results": final_results,
+		"mode": game_mode,
+		"duration": game_duration - time_remaining
+	})
 
 @rpc("authority", "reliable", "call_local")
 func _sync_game_end(results: Dictionary, winner: Dictionary):
 	"""Sync game end to all clients"""
 	final_results = results
-	game_ended.emit(winner)
+	game_ended.emit({
+		"winner": winner,
+		"results": results,
+		"mode": game_mode,
+		"duration": game_duration - time_remaining
+	})
 
 func _determine_winner() -> Dictionary:
 	"""Determine the winner based on coverage"""
@@ -772,3 +800,46 @@ func _sync_game_state_to_client(players_data: Dictionary, mode: String):
 		
 		# Update UI if needed
 		game_state_synced.emit(players_data, mode)
+
+func _exit_tree():
+	"""Clean up when the GameManager is being destroyed"""
+	print("=== GAMEMANAGER CLEANUP ===")
+	cleanup_all_tanks()
+
+func cleanup_all_tanks():
+	"""Explicitly clean up all tank references and nodes"""
+	print("Cleaning up all tanks from GameManager...")
+	var tanks_cleaned = 0
+	
+	for player_id in players.keys():
+		var player_data = players[player_id]
+		if player_data.has("tank_node") and is_instance_valid(player_data.tank_node):
+			print("Cleaning up tank for player ", player_id, ": ", player_data.tank_node.name)
+			player_data.tank_node.queue_free()
+			player_data.tank_node = null
+			tanks_cleaned += 1
+	
+	# Clear respawn timers
+	for timer in dead_players.values():
+		if is_instance_valid(timer):
+			timer.queue_free()
+	dead_players.clear()
+	
+	print("Cleaned up ", tanks_cleaned, " tank(s) from GameManager")
+	players.clear()
+
+func cleanup_game_state():
+	"""Public method to clean up game state when transitioning scenes"""
+	print("=== CLEANING GAME STATE ===")
+	game_active = false
+	
+	# Stop timers
+	if is_instance_valid(game_timer):
+		game_timer.stop()
+	if is_instance_valid(coverage_update_timer):
+		coverage_update_timer.stop()
+	
+	# Clean up tanks
+	cleanup_all_tanks()
+	
+	print("Game state cleaned up")

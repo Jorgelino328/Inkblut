@@ -50,12 +50,31 @@ func change_scene(scene_name: String):
 		current_scene.queue_free()
 		current_scene = null
 	
-	# Also clean up any game scenes that might be siblings to this controller
+	# Clean up any existing game scenes that might be siblings to this controller
+	# This is crucial for proper cleanup when transitioning from game scenes to UI scenes
 	if get_parent():
 		for child in get_parent().get_children():
-			if child != self and child.name in ["map_1", "map_2", "map_3"]:
+			if child != self and (child.name in ["map_1", "map_2", "map_3"] or child.name.begins_with("Map")):
 				print("Cleaning up old game scene: ", child.name)
+				
+				# Try to find and cleanup GameManager first
+				var game_manager = child.get_node_or_null("GameManager")
+				if game_manager and game_manager.has_method("cleanup_game_state"):
+					print("Found GameManager, calling cleanup_game_state...")
+					game_manager.cleanup_game_state()
+				
+				# Check for tanks within the game scene before freeing
+				_cleanup_tanks_in_scene(child)
 				child.queue_free()
+	
+	# Also check for any loose tank nodes that might be direct children of the root
+	_cleanup_loose_tanks()
+	
+	# If we're transitioning from a game scene, wait a frame for cleanup
+	var was_game_scene = current_scene_name in GAME_SCENES
+	if was_game_scene:
+		print("Was game scene, waiting for cleanup...")
+		await get_tree().process_frame
 	
 	# Determine if this is a UI scene or game scene
 	var is_ui_scene = scene_name in UI_SCENES
@@ -238,37 +257,38 @@ func _on_quit_to_main_menu_pressed():
 	change_scene("global_lobby")
 
 func _on_create_lobby_pressed():
-	# Get the selected options from the custom match scene
-	var game_mode_option = current_scene.get_node_or_null("MenuContainer/GameModeButton")
-	var map_option = current_scene.get_node_or_null("MenuContainer/MapButton")
-	var player_limit_option = current_scene.get_node_or_null("MenuContainer/OptionsContainer/PlayerContainer/OptionButton")
+	"""Handle create lobby button press with validation"""
+	var game_mode_button = current_scene.get_node_or_null("MenuContainer/GameModeButton")
+	var map_button = current_scene.get_node_or_null("MenuContainer/MapButton")
+	var player_limit_button = current_scene.get_node_or_null("MenuContainer/OptionsContainer/PlayerContainer/sss")
 	
-	var game_mode = "FREE-FOR-ALL"
-	var map_name = "MAP 1"
+	# Validate selections
+	if not game_mode_button or game_mode_button.selected <= 0:
+		print("ERROR: Please select a game mode")
+		return
+	
+	if not map_button or map_button.selected <= 0:
+		print("ERROR: Please select a map")
+		return
+	
+	# Get values
+	var game_mode = game_mode_button.get_item_text(game_mode_button.selected)
+	var map_name = map_button.get_item_text(map_button.selected)
 	var max_players = 4
 	
-	if game_mode_option:
-		game_mode = game_mode_option.get_item_text(game_mode_option.selected)
+	if player_limit_button and player_limit_button.selected >= 0:
+		max_players = player_limit_button.get_item_id(player_limit_button.selected)
 	
-	if map_option:
-		map_name = map_option.get_item_text(map_option.selected)
+	# Convert map name to scene format
+	var scene_map_name = map_name.to_lower().replace(" ", "_")
+	var server_name = "Custom Match"
 	
-	if player_limit_option:
-		max_players = player_limit_option.selected + 2  # Options start from 2 players
+	print("Creating server: ", server_name, ", Mode: ", game_mode, ", Map: ", scene_map_name, ", Players: ", max_players)
 	
-	print("=== CREATING SERVER ===")
-	print("Game Mode: ", game_mode)
-	print("Map: ", map_name)
-	print("Max Players: ", max_players)
-	
-	var server_name = "Player's Lobby"
-	
-	# Create the server (await since it's a coroutine)
-	var success = await network_manager.create_server(server_name, game_mode, map_name, max_players)
-	
+	# Create server
+	var success = await network_manager.create_server(server_name, game_mode, scene_map_name, max_players)
 	if success:
-		print("Server created successfully!")
-		# Go to lobby to wait for players
+		print("Server created successfully")
 		change_scene("lobby")
 	else:
 		print("Failed to create server")
@@ -332,3 +352,54 @@ func _set_game_mode_deferred(game_mode: String, scene_name: String):
 				print("  - ", child.name, " (", child.get_class(), ")")
 	else:
 		print("ERROR: No current_scene when trying to set game mode")
+
+# Helper function to clean up tanks within a game scene
+func _cleanup_tanks_in_scene(scene_node: Node):
+	"""Remove all tank nodes from a game scene"""
+	if not scene_node:
+		return
+		
+	print("Checking for tanks in scene: ", scene_node.name)
+	var tanks_found = 0
+	
+	# Recursively search for tank nodes
+	_find_and_cleanup_tanks_recursive(scene_node, tanks_found)
+	
+	if tanks_found > 0:
+		print("Cleaned up ", tanks_found, " tank(s) from scene: ", scene_node.name)
+
+func _find_and_cleanup_tanks_recursive(node: Node, tanks_found: int):
+	"""Recursively find and clean up tank nodes"""
+	for child in node.get_children():
+		# Check if this is a tank node (by name or by script)
+		if child.name.begins_with("Tank") or child.name.to_lower().contains("tank"):
+			print("Found tank to cleanup: ", child.name, " at position: ", child.global_position if child.has_method("get_global_position") else "unknown")
+			child.queue_free()
+			tanks_found += 1
+		elif child.get_script() and child.get_script().resource_path.contains("tank.gd"):
+			print("Found tank by script: ", child.name, " at position: ", child.global_position if child.has_method("get_global_position") else "unknown")
+			child.queue_free()
+			tanks_found += 1
+		else:
+			# Recursively check children
+			_find_and_cleanup_tanks_recursive(child, tanks_found)
+
+func _cleanup_loose_tanks():
+	"""Clean up any tanks that might be direct children of the root scene"""
+	var root = get_tree().current_scene
+	if root:
+		print("Checking root scene for loose tanks: ", root.name)
+		var tanks_found = 0
+		
+		for child in root.get_children():
+			if child.name.begins_with("Tank") or child.name.to_lower().contains("tank"):
+				print("Found loose tank to cleanup: ", child.name, " at position: ", child.global_position if child.has_method("get_global_position") else "unknown")
+				child.queue_free()
+				tanks_found += 1
+			elif child.get_script() and child.get_script().resource_path.contains("tank.gd"):
+				print("Found loose tank by script: ", child.name, " at position: ", child.global_position if child.has_method("get_global_position") else "unknown")
+				child.queue_free()
+				tanks_found += 1
+		
+		if tanks_found > 0:
+			print("Cleaned up ", tanks_found, " loose tank(s) from root scene")

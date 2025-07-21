@@ -113,7 +113,8 @@ func create_server(server_name: String, game_mode: String, map_name: String, max
 		"map": map_name,
 		"max_players": max_players,
 		"current_players": 1,
-		"port": port
+		"port": port,
+		"status": "waiting"  # waiting, active, ended
 	}
 	
 	# Start UDP server for discovery
@@ -501,3 +502,18 @@ func _on_quick_play_server_list_updated(servers: Array):
 	var success = connect_to_server("127.0.0.1", random_server.get("port", DEFAULT_PORT))
 	if not success:
 		print("Failed to initiate quick play connection")
+
+func set_server_status(status: String):
+	"""Update the server status (waiting, active, ended)"""
+	if is_server and server_info.size() > 0:
+		server_info.status = status
+		print("Server status updated to: ", status)
+		server_info_updated.emit()
+
+func mark_game_started():
+	"""Mark the game as started/active"""
+	set_server_status("active")
+
+func mark_game_ended():
+	"""Mark the game as ended"""
+	set_server_status("ended")

@@ -27,14 +27,18 @@ func _on_game_started():
 	if game_results:
 		game_results.hide()
 
-func _on_game_ended(winner_data):
+func _on_game_ended(game_end_data):
 	"""Called when the game ends"""
-	print("Game ended with winner: ", winner_data)
+	print("Game ended with data: ", game_end_data)
 	
 	if game_hud:
 		game_hud.hide()
 	if game_results:
-		game_results.show_results(winner_data)
+		var winner = game_end_data.get("winner", {})
+		var results = game_end_data.get("results", {})
+		var mode = game_end_data.get("mode", "")
+		var duration = game_end_data.get("duration", 0.0)
+		game_results.show_results(results, winner, mode, duration)
 
 func _on_game_timer_updated(time_left: float):
 	"""Update the timer display"""

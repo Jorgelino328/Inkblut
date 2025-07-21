@@ -121,9 +121,9 @@ func _create_score_entry(rank: int, player_info: Dictionary) -> Control:
 	container.add_child(player_label)
 	
 	# Team (if applicable)
-	if player_info.team != "Individual":
+	if game_mode == "TEAM DEATHMATCH" or game_mode == "TEAM":
 		var team_label = Label.new()
-		team_label.text = "(" + player_info.team + ")"
+		team_label.text = "(Team " + str(player_info.team) + ")"
 		team_label.custom_minimum_size.x = 100
 		container.add_child(team_label)
 	
@@ -187,13 +187,13 @@ func _on_rematch_pressed():
 	# TODO: For non-host players, send rematch request to host
 
 func _on_lobby_pressed():
-	"""Return to the global lobby"""
+	"""Return to the match lobby"""
 	print("Returning to lobby")
 	
 	# Transition to lobby scene
 	var scene_controller = get_tree().get_first_node_in_group("scene_controller")
 	if scene_controller:
-		scene_controller.change_scene("global_lobby")
+		scene_controller.change_scene("lobby")
 
 func _on_quit_pressed():
 	"""Quit to main menu"""
