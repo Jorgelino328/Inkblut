@@ -656,3 +656,23 @@ func get_current_game_mode() -> String:
 func get_connected_players() -> Dictionary:
 	"""Get the current connected players dictionary"""
 	return connected_players.duplicate()
+
+# === GAME STATE FUNCTIONS ===
+
+func mark_game_started():
+	"""Mark the game as started (called by GameManager)"""
+	if is_server:
+		server_info["status"] = "active"
+		print("Game marked as started - server status: active")
+		server_info_updated.emit()
+	else:
+		print("Client received mark_game_started - ignoring (not server)")
+
+func mark_game_ended():
+	"""Mark the game as ended"""
+	if is_server:
+		server_info["status"] = "ended"
+		print("Game marked as ended - server status: ended")
+		server_info_updated.emit()
+	else:
+		print("Client received mark_game_ended - ignoring (not server)")
