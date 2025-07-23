@@ -12,6 +12,7 @@ var network_manager: NetworkManager
 var user_manager: Node
 var is_host: bool = false
 var current_user: UserManager.UserData = null
+var connected_players: Dictionary = {}  # player_id -> player_name
 
 func _ready():
 	print("=== LOBBY READY ===")
@@ -48,6 +49,7 @@ func _ready():
 		current_user = user_manager.get_current_user()
 		if current_user:
 			print("Current user in lobby: ", current_user.username)
+			# connected_players will be populated by NetworkManager signals
 	
 	# Connect UI signals - with null checks
 	if start_game_button:
@@ -80,7 +82,7 @@ func _ready():
 	# Initialize chat
 	_initialize_chat()
 	
-	# Update server info
+	# Update server info and player list
 	_update_server_info()
 	_update_player_list()
 
@@ -131,47 +133,112 @@ func _update_player_list():
 	print("Is Host: ", is_host)
 	print("Multiplayer ID: ", multiplayer.get_unique_id())
 	print("Connected Peers: ", multiplayer.get_peers())
+	print("Connected Players: ", connected_players)
 	print("Player list container children: ", player_list.get_child_count())
+	print("Current user: ", current_user)
 	
-	# Clear existing player labels (except the first one)
-	for i in range(player_list.get_child_count() - 1, 0, -1):
-		player_list.get_child(i).queue_free()
+	if not player_list:
+		print("ERROR: player_list is null")
+		return
 	
-	# Update host label
-	var host_label = player_list.get_child(0) as Label
-	if is_host:
-		host_label.text = "1. Host (You)"
-		print("Set host label to: Host (You)")
+	# Clear existing player labels
+	for child in player_list.get_children():
+		child.queue_free()
+	
+	# Build the complete player list
+	var all_players = []
+	
+	# Add host (ID 1)
+	var host_name = "Host"
+	if is_host and current_user:
+		# We are the host, use our username
+		host_name = current_user.username
 	else:
-		host_label.text = "1. Host"
-		print("Set host label to: Host")
+		# We're not the host, try to get host's name from connected_players
+		host_name = connected_players.get(1, "Host")
 	
-	# Add other players (this would be expanded with actual multiplayer data)
+	all_players.append({"id": 1, "name": host_name, "is_host": true, "is_self": is_host})
+	
+	# Add all other connected players
 	var connected_peers = multiplayer.get_peers()
-	print("Adding ", connected_peers.size(), " connected peers to list")
+	var my_id = multiplayer.get_unique_id()
 	
-	for i in range(connected_peers.size()):
+	print("My ID: ", my_id)
+	print("Connected peers: ", connected_peers)
+	print("Is host: ", is_host)
+	
+	# Add myself if I'm not the host
+	if not is_host:
+		var my_name = "Player " + str(my_id)
+		if current_user:
+			my_name = current_user.username
+			print("Adding myself with username: ", my_name)
+		
+		all_players.append({"id": my_id, "name": my_name, "is_host": false, "is_self": true})
+	
+	# Add all other connected peers
+	for peer_id in connected_peers:
+		if peer_id == 1:  # Skip host, already added
+			continue
+		if peer_id == my_id:  # Skip myself, already added above
+			continue
+			
+		var player_name = connected_players.get(peer_id, "Player " + str(peer_id))
+		
+		all_players.append({"id": peer_id, "name": player_name, "is_host": false, "is_self": false})
+	
+	# Sort players: host first, then by ID
+	all_players.sort_custom(func(a, b): 
+		if a.is_host and not b.is_host:
+			return true
+		if not a.is_host and b.is_host:
+			return false
+		return a.id < b.id
+	)
+	
+	# Create labels for all players
+	var player_index = 1
+	for player_data in all_players:
 		var player_label = Label.new()
-		player_label.text = "%d. Player %d" % [i + 2, connected_peers[i]]
+		
+		var label_text = "%d. %s" % [player_index, player_data.name]
+		
+		if player_data.is_host:
+			if player_data.is_self:
+				label_text += " (Host - You)"
+			else:
+				label_text += " (Host)"
+		elif player_data.is_self:
+			label_text += " (You)"
+		
+		player_label.text = label_text
 		player_label.add_theme_font_size_override("font_size", 24)
 		player_list.add_child(player_label)
 		print("Added player label: ", player_label.text)
+		player_index += 1
 
 func _update_debug_info():
 	# Debug function removed - no longer needed for production
 	pass
 
 func _on_player_joined(id: int, name: String):
-	print("Player joined lobby: ", name)
+	print("=== LOBBY: PLAYER JOINED SIGNAL ===")
+	print("Player joined lobby: ", name, " (ID: ", id, ")")
+	print("My ID: ", multiplayer.get_unique_id())
+	print("Is host: ", is_host)
+	connected_players[id] = name
+	print("Updated connected_players: ", connected_players)
 	_update_player_list()
 	_update_server_info()  # Update server info to show new player count and team status
 	_add_system_message(name + " joined the lobby.")
 
 func _on_player_left(id: int):
 	print("Player left lobby: ", id)
+	var player_name = connected_players.get(id, "Player " + str(id))
+	connected_players.erase(id)
 	_update_player_list()
 	_update_server_info()  # Update server info to show new player count and team status
-	_add_system_message("Player " + str(id) + " left the lobby.")
+	_add_system_message(player_name + " left the lobby.")
 
 func _on_start_game_pressed():
 	if is_host:

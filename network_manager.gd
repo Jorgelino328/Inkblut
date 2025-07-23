@@ -14,6 +14,7 @@ var multiplayer_peer: ENetMultiplayerPeer
 var is_server: bool = false
 var server_info: Dictionary = {}
 var available_servers: Array[Dictionary] = []
+var connected_players: Dictionary = {}  # player_id -> username mapping
 
 # Server discovery
 var udp_server: UDPServer
@@ -121,6 +122,18 @@ func create_server(server_name: String, game_mode: String, map_name: String, max
 	print("Starting UDP discovery server for created server...")
 	_start_discovery_server(port)
 	
+	# Add host to connected players and emit player_joined for the host (server)
+	var user_manager = get_node("/root/UserManager")
+	var host_username = "Host"
+	if user_manager:
+		var current_user = user_manager.get_current_user()
+		if current_user:
+			host_username = current_user.username
+	
+	connected_players[1] = host_username  # Server ID is always 1
+	print("Emitting player_joined for host: ", host_username)
+	player_joined.emit(1, host_username)  # Server ID is always 1
+	
 	print("=== SERVER CREATED SUCCESSFULLY ===")
 	print("Name: ", server_name)
 	print("Port: ", port)
@@ -177,6 +190,9 @@ func disconnect_from_server():
 	# Clear server info if we were hosting
 	if server_info.size() > 0:
 		server_info.clear()
+	
+	# Clear connected players list
+	connected_players.clear()
 	
 	print("Disconnected from server")
 
@@ -363,10 +379,23 @@ func _on_peer_connected(id: int):
 		
 		# Send complete server info to the new client
 		_sync_server_info_to_client.rpc_id(id, server_info)
+		
+		# Send the host's username to the new client immediately
+		var host_username = connected_players.get(1, "Host")
+		_notify_player_joined.rpc_id(id, 1, host_username)
+		
+		# Request the client's username
+		_request_username.rpc_id(id)
+		
+		# After getting the username, we'll send the player list in _send_username
+		
+		# Don't emit player_joined yet - wait for username response
+	else:
+		# If we're a client and someone else connected, emit with temporary name
+		player_joined.emit(id, "Player " + str(id))
 	
-	player_joined.emit(id, "Player " + str(id))
 	server_info_updated.emit()
-	print("Emitted player_joined signal")
+	print("Updated server info for new peer connection")
 
 func _on_peer_disconnected(id: int):
 	print("=== PEER DISCONNECTED ===")
@@ -376,6 +405,10 @@ func _on_peer_disconnected(id: int):
 	if is_server:
 		server_info.current_players -= 1
 		print("Updated server player count: ", server_info.current_players)
+		
+		# Remove player from connected_players dictionary
+		connected_players.erase(id)
+		print("Removed player from connected_players list")
 	
 	player_left.emit(id)
 	server_info_updated.emit()
@@ -525,3 +558,101 @@ func _send_lobby_chat_to_server(username: String, message: String):
 		_relay_lobby_chat.rpc(username, message)
 	else:
 		print("ERROR: Non-server received _send_lobby_chat_to_server")
+
+# === USERNAME EXCHANGE FUNCTIONS ===
+
+@rpc("call_remote", "reliable")
+func _request_username():
+	"""Server requests client's username"""
+	print("Server requesting my username...")
+	var user_manager = get_node("/root/UserManager")
+	if user_manager:
+		var current_user = user_manager.get_current_user()
+		if current_user:
+			print("Sending my username to server: ", current_user.username)
+			_send_username.rpc_id(1, current_user.username)
+		else:
+			print("No current user found, sending default name")
+			_send_username.rpc_id(1, "Player " + str(multiplayer.get_unique_id()))
+	else:
+		print("UserManager not found, sending default name")
+		_send_username.rpc_id(1, "Player " + str(multiplayer.get_unique_id()))
+
+@rpc("call_remote", "reliable")
+func _send_username(username: String):
+	"""Client sends username to server"""
+	print("=== SEND USERNAME RPC CALLED ===")
+	print("Username: ", username)
+	print("Is server: ", is_server)
+	print("Remote sender ID: ", multiplayer.get_remote_sender_id())
+	
+	if is_server:
+		var sender_id = multiplayer.get_remote_sender_id()
+		print("Received username from client ", sender_id, ": ", username)
+		
+		# Store the username
+		connected_players[sender_id] = username
+		print("Updated connected_players: ", connected_players)
+		
+		# Emit player_joined signal locally on server for server's lobby
+		print("Emitting player_joined locally for server...")
+		player_joined.emit(sender_id, username)
+		
+		# Send new player info to all other clients (excluding the new player)
+		var all_peers = multiplayer.get_peers()
+		print("Sending new player info to clients: ", all_peers)
+		for peer_id in all_peers:
+			if peer_id != sender_id:  # Don't send to the new player themselves
+				print("Sending new player info to peer: ", peer_id)
+				_notify_player_joined.rpc_id(peer_id, sender_id, username)
+	else:
+		print("ERROR: Non-server received _send_username")
+
+@rpc("call_remote", "reliable")
+func _notify_player_joined(player_id: int, username: String):
+	"""Server notifies clients that a player joined"""
+	print("=== NOTIFY PLAYER JOINED RPC ===")
+	print("Player ID: ", player_id)
+	print("Username: ", username)
+	print("My ID: ", multiplayer.get_unique_id())
+	print("Is server: ", is_server)
+	player_joined.emit(player_id, username)
+
+@rpc("call_remote", "reliable")
+func _send_player_list_to_client(player_list: Dictionary):
+	"""Server sends current player list to a new client"""
+	print("=== RECEIVED PLAYER LIST FROM SERVER ===")
+	print("Player list: ", player_list)
+	print("My ID: ", multiplayer.get_unique_id())
+	print("Is server: ", is_server)
+	
+	# Emit player_joined for each existing player
+	for player_id in player_list:
+		var username = player_list[player_id]
+		print("Adding existing player: ", username, " (ID: ", player_id, ")")
+		player_joined.emit(player_id, username)
+
+@rpc("call_remote", "reliable")
+func _request_player_list():
+	"""Client requests current player list from server"""
+	print("Client requesting player list...")
+	if is_server:
+		var sender_id = multiplayer.get_remote_sender_id()
+		print("Sending player list to client ", sender_id, ": ", connected_players)
+		_send_player_list_to_client.rpc_id(sender_id, connected_players)
+	else:
+		print("ERROR: Non-server received _request_player_list")
+
+# === GETTER FUNCTIONS ===
+
+func get_current_map() -> String:
+	"""Get the current map from server info"""
+	return server_info.get("map", "map_1")
+
+func get_current_game_mode() -> String:
+	"""Get the current game mode from server info"""
+	return server_info.get("game_mode", "FREE-FOR-ALL")
+
+func get_connected_players() -> Dictionary:
+	"""Get the current connected players dictionary"""
+	return connected_players.duplicate()
