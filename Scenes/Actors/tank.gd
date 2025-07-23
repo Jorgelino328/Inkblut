@@ -39,6 +39,9 @@ func _ready():
 	# Check if this is the local player's tank
 	is_local_player = is_multiplayer_authority()
 	
+	# Enable camera only for local player
+	_setup_camera()
+	
 	# Disable animation tracks that control cannon rotation to allow manual control
 	_disable_cannon_rotation_tracks()
 	
@@ -57,6 +60,16 @@ func _ready():
 	# Initialize mouse position for local player
 	if is_local_player:
 		last_mouse_position = get_viewport().get_mouse_position()
+
+func _setup_camera():
+	"""Enable camera only for the local player"""
+	var camera = $Camera2D
+	if camera:
+		camera.enabled = is_local_player
+		if is_local_player:
+			print("Camera enabled for local player tank: ", player_id)
+		else:
+			print("Camera disabled for remote player tank: ", player_id)
 
 func _disable_cannon_rotation_tracks():
 	"""Disable animation tracks that control cannon rotation"""
@@ -285,8 +298,24 @@ func respawn():
 	
 	# Emit health update signal
 	emit_signal("health_changed", current_hp, max_hp)
+
+@rpc("any_peer", "reliable", "call_local")
+func heal(amount: int):
+	"""Heal the tank by the specified amount"""
+	if is_dead:
+		return
+		
+	var old_hp = current_hp
+	current_hp = min(current_hp + amount, max_hp)
 	
-	print("Player ", player_id, " respawned")
+	if current_hp != old_hp:
+		# Emit health_changed signal
+		emit_signal("health_changed", current_hp, max_hp)
+		print("Player ", player_id, " healed for ", current_hp - old_hp, " HP. HP: ", current_hp, "/", max_hp)
+
+func heal_full():
+	"""Fully restore the tank's HP"""
+	heal(max_hp)
 
 func _on_hit_floor(body):
 	anim.play("Jump_Land")

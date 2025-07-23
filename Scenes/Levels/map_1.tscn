@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://bje6ke5opwe4r"]
+[gd_scene load_steps=15 format=3 uid="uid://bje6ke5opwe4r"]
 
 [ext_resource type="TileSet" uid="uid://utj8sukqowuk" path="res://Scenes/Levels/test_tileset.tres" id="1_o7rkv"]
 [ext_resource type="Texture2D" uid="uid://cnggid6tgxat6" path="res://Assets/Sprites/background0.png" id="2_gy663"]
@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://bslej8clt4cyx" path="res://Scenes/UI/game_hud.tscn" id="4_game_hud"]
 [ext_resource type="PackedScene" uid="uid://b2lxj8t4v6n0y" path="res://Scenes/UI/game_results.tscn" id="5_game_results"]
 [ext_resource type="Script" path="res://Scenes/Levels/map_1.gd" id="6_map1_script"]
+[ext_resource type="PackedScene" path="res://Scenes/Items/health_pack.tscn" id="8_1fiau"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(120, 120)
@@ -100,3 +101,11 @@ metadata/_edit_lock_ = true
 [node name="GameResults" parent="UI" instance=ExtResource("5_game_results")]
 visible = false
 metadata/_edit_lock_ = true
+
+[node name="HealthPack2" parent="." instance=ExtResource("8_1fiau")]
+position = Vector2(1152, 120)
+scale = Vector2(2, 2)
+
+[node name="HealthPack3" parent="." instance=ExtResource("8_1fiau")]
+position = Vector2(-352, 540)
+scale = Vector2(2, 2)
