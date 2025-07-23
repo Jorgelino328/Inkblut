@@ -2,7 +2,7 @@ extends Node2D
 
 @onready var game_manager: GameManager = $GameManager
 @onready var game_hud = $UI/GameHUD
-@ontml:parameter name="game_results = $UI/GameResults
+@onready var game_results = $UI/GameResults
 @onready var paintable_map = $PaintableWalls
 
 func _ready():
